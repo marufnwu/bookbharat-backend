@@ -10,12 +10,6 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\AddressController;
-use App\Http\Controllers\Api\WishlistController;
-use App\Http\Controllers\Api\ReviewController;
-use App\Http\Controllers\Api\ContactController;
-use App\Http\Controllers\Api\NewsletterController;
-use App\Http\Controllers\Api\StaticPageController;
-use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
@@ -101,20 +95,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/content/{slug}', [ConfigurationController::class, 'getContentPage']);
     });
 
-    // Static Pages Routes (Public)
-    Route::prefix('pages')->group(function () {
-        Route::get('/', [StaticPageController::class, 'getPages']);
-        Route::get('/{slug}', [StaticPageController::class, 'getPage']);
-    });
-
-    // FAQ Routes (Public)
-    Route::prefix('faqs')->group(function () {
-        Route::get('/', [FaqController::class, 'index']);
-        Route::get('/categories', [FaqController::class, 'getCategories']);
-        Route::get('/search', [FaqController::class, 'search']);
-        Route::get('/{id}', [FaqController::class, 'show']);
-    });
-
     // Cart Routes (Public - supports both guest and authenticated users)
     Route::prefix('cart')->group(function () {
         Route::get('/', [CartController::class, 'index']);
@@ -128,24 +108,6 @@ Route::prefix('v1')->group(function () {
     });
 
     // Coupon Routes
-
-    // Public Review Routes
-
-    // Contact Routes (Public)
-
-    // Newsletter Routes (Public)
-    Route::prefix('newsletter')->group(function () {
-        Route::post('/subscribe', [NewsletterController::class, 'subscribe']);
-        Route::post('/unsubscribe', [NewsletterController::class, 'unsubscribe']);
-        Route::get('/status', [NewsletterController::class, 'getStatus']);
-    });
-    Route::prefix('contact')->group(function () {
-        Route::post('/submit', [ContactController::class, 'submit']);
-        Route::get('/categories', [ContactController::class, 'getCategories']);
-    });
-    Route::prefix('reviews')->group(function () {
-        Route::get('/product/{productId}', [ReviewController::class, 'index']);
-    });
     Route::prefix('coupons')->group(function () {
         Route::get('/available', [CartController::class, 'getAvailableCoupons']);
     });
@@ -181,28 +143,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/validate', [AddressController::class, 'validateAddress']);
         });
 
-        // Wishlist Routes
-
-        // Review Routes
-        Route::prefix('reviews')->group(function () {
-            Route::post('/', [ReviewController::class, 'store']);
-            Route::get('/my-reviews', [ReviewController::class, 'userReviews']);
-            Route::put('/{id}', [ReviewController::class, 'update']);
-            Route::delete('/{id}', [ReviewController::class, 'destroy']);
-            Route::get('/eligible-products', [ReviewController::class, 'eligibleProducts']);
-            Route::get('/my-stats', [ReviewController::class, 'userStats']);
-            Route::post('/{id}/report', [ReviewController::class, 'report']);
-        });
-        Route::prefix('wishlist')->group(function () {
-            Route::get('/', [WishlistController::class, 'index']);
-            Route::post('/', [WishlistController::class, 'store']);
-            Route::put('/{id}', [WishlistController::class, 'update']);
-            Route::delete('/{id}', [WishlistController::class, 'destroy']);
-            Route::post('/check', [WishlistController::class, 'check']);
-            Route::post('/move-to-cart', [WishlistController::class, 'moveToCart']);
-            Route::delete('/clear/all', [WishlistController::class, 'clear']);
-            Route::get('/stats', [WishlistController::class, 'stats']);
-        });
+        // Note: Review, and Wishlist controllers will be implemented in next phase
     });
 
     // Admin routes (require admin role)
