@@ -115,6 +115,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/{id}', [FaqController::class, 'show']);
     });
 
+    // Hero Configuration Routes
+    Route::prefix('hero')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\HeroConfigController::class, 'index']);
+        Route::get('/active', [App\Http\Controllers\Api\HeroConfigController::class, 'getActive']);
+        Route::get('/{variant}', [App\Http\Controllers\Api\HeroConfigController::class, 'show']);
+        Route::post('/set-active', [App\Http\Controllers\Api\HeroConfigController::class, 'setActive']);
+        Route::put('/{variant}', [App\Http\Controllers\Api\HeroConfigController::class, 'update']);
+    });
+
     // Cart Routes (Public - supports both guest and authenticated users)
     Route::prefix('cart')->group(function () {
         Route::get('/', [CartController::class, 'index']);
