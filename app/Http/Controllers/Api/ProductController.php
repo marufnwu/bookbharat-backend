@@ -5,10 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Category;
+use App\Services\ProductRecommendationService;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    protected $recommendationService;
+
+    public function __construct(ProductRecommendationService $recommendationService)
+    {
+        $this->recommendationService = $recommendationService;
+    }
     /**
      * Display a listing of products
      */
@@ -328,5 +335,54 @@ class ProductController extends Controller
         ])->header('Access-Control-Allow-Origin', '*')
           ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
           ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+    }
+
+    /**
+     * Get related products for a specific product
+     */
+    public function getRelatedProducts($id)
+    {
+        // Handle both ID and slug
+        if (!is_numeric($id)) {
+            $product = Product::where('slug', $id)->firstOrFail();
+            $id = $product->id; // Use numeric ID for the service
+        }
+        
+        $relatedProducts = $this->recommendationService->getRelatedProducts($id, 6);
+
+        return response()->json([
+            'success' => true,
+            'data' => $relatedProducts
+        ]);
+    }
+
+    /**
+     * Get frequently bought together products
+     */
+    public function getFrequentlyBoughtTogether($id)
+    {
+        // Handle both ID and slug
+        if (is_numeric($id)) {
+            $product = Product::findOrFail($id);
+        } else {
+            $product = Product::where('slug', $id)->firstOrFail();
+            $id = $product->id; // Use numeric ID for the service
+        }
+        
+        $result = $this->recommendationService->getFrequentlyBoughtTogether($id, 2);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'main_product' => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'price' => $product->price,
+                    'image_url' => $product->primary_image ? $product->primary_image->image_path : null
+                ],
+                'products' => $result['products'],
+                'bundle_data' => $result['bundle_data']
+            ]
+        ]);
     }
 }

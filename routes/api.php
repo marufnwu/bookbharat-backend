@@ -66,6 +66,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/suggestions', [ProductController::class, 'suggestions']);
         Route::get('/filters', [ProductController::class, 'filters']);
         Route::get('/{id}', [ProductController::class, 'show']);
+        Route::get('/{id}/related', [ProductController::class, 'getRelatedProducts']);
+        Route::get('/{id}/frequently-bought-together', [ProductController::class, 'getFrequentlyBoughtTogether']);
         Route::get('/category/{categoryId}', [ProductController::class, 'byCategory']);
     });
 

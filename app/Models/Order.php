@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use App\Listeners\UpdateProductAssociations;
 
 class Order extends Model
 {
@@ -127,5 +128,19 @@ class Order extends Model
     public function getCanBeCancelledAttribute()
     {
         return in_array($this->status, ['pending', 'processing']);
+    }
+
+    // Boot method to register model events
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updated(function ($order) {
+            // When order status changes to delivered or completed, update product associations
+            if ($order->isDirty('status') && in_array($order->status, ['delivered', 'completed'])) {
+                $listener = new UpdateProductAssociations();
+                $listener->handle($order);
+            }
+        });
     }
 }
