@@ -233,6 +233,10 @@ class ProductRecommendationService
         // Get the main category (most common among products)
         $categoryIds = $products->pluck('category_id')->filter();
         $categoryId = $categoryIds->isNotEmpty() ? $categoryIds->first() : null;
+        $categoryIds = $products->pluck('category_id')->filter();
+        $categoryId = $categoryIds->isNotEmpty() ? $categoryIds->first() : null;
+        $categoryIds = $products->pluck('category_id')->filter();
+        $categoryId = $categoryIds->isNotEmpty() ? $categoryIds->first() : null;
         
         // Get customer tier if user is authenticated
         $customerTier = null;
