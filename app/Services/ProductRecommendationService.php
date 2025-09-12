@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\ProductAssociation;
+use App\Models\BundleDiscountRule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
 
 class ProductRecommendationService
 {
@@ -191,10 +193,15 @@ class ProductRecommendationService
             return $product->compare_price ?: $product->price;
         });
 
-        // Dynamic discount based on bundle size
-        $discountPercentage = $this->getBundleDiscount($products->count());
-        $bundlePrice = $totalPrice * (1 - $discountPercentage / 100);
-        $savings = $totalPrice - $bundlePrice;
+        // Get dynamic discount from database
+        $discountData = $this->getBundleDiscount($products);
+        $discountPercentage = $discountData['percentage'];
+        $discountAmount = $discountData['amount'];
+        $discountRule = $discountData['rule'];
+        
+        // Calculate bundle price
+        $bundlePrice = $totalPrice - $discountAmount;
+        $savings = $discountAmount;
 
         // Track bundle view for analytics
         $this->trackBundleView($products->pluck('id')->toArray());
@@ -205,14 +212,97 @@ class ProductRecommendationService
             'total_original_price' => round($totalOriginalPrice, 2),
             'savings' => round($savings, 2),
             'discount_percentage' => $discountPercentage,
-            'product_count' => $products->count()
+            'discount_amount' => round($discountAmount, 2),
+            'product_count' => $products->count(),
+            'discount_rule' => $discountRule ? [
+                'name' => $discountRule->name,
+                'description' => $discountRule->description,
+                'type' => $discountRule->discount_type,
+            ] : null
         ];
     }
 
     /**
-     * Get bundle discount based on number of products
+     * Get bundle discount based on dynamic rules
      */
-    protected function getBundleDiscount($productCount)
+    protected function getBundleDiscount($products)
+    {
+        $productCount = $products->count();
+        $totalAmount = $products->sum('price');
+        
+        // Get the main category (most common among products)
+        $categoryId = $products->pluck('category_id')
+            ->mode() // Get most frequent category
+            ->first();
+        
+        // Get customer tier if user is authenticated
+        $customerTier = null;
+        if (Auth::check()) {
+            $user = Auth::user();
+            $customerTier = $user->customer_tier ?? null;
+        }
+        
+        // Find applicable discount rule
+        $rule = BundleDiscountRule::getApplicableRule($productCount, $categoryId, $customerTier);
+        
+        // If no rule found, use legacy defaults
+        if (!$rule) {
+            // Fallback to hardcoded values if no rules in database
+            $percentage = $this->getLegacyBundleDiscount($productCount);
+            $amount = $totalAmount * ($percentage / 100);
+            
+            return [
+                'percentage' => $percentage,
+                'amount' => $amount,
+                'rule' => null
+            ];
+        }
+        
+        // Check if rule conditions match the products
+        if (!$rule->matchesConditions($products->toArray())) {
+            // Rule doesn't match conditions, try next best rule
+            $rule = BundleDiscountRule::active()
+                ->currentlyValid()
+                ->forProductCount($productCount)
+                ->forCategory($categoryId)
+                ->forCustomerTier($customerTier)
+                ->where('id', '!=', $rule->id)
+                ->orderBy('priority', 'desc')
+                ->get()
+                ->first(function ($r) use ($products) {
+                    return $r->matchesConditions($products->toArray());
+                });
+        }
+        
+        if (!$rule) {
+            // No matching rule, use legacy defaults
+            $percentage = $this->getLegacyBundleDiscount($productCount);
+            $amount = $totalAmount * ($percentage / 100);
+            
+            return [
+                'percentage' => $percentage,
+                'amount' => $amount,
+                'rule' => null
+            ];
+        }
+        
+        // Calculate discount based on rule
+        $discountAmount = $rule->calculateDiscount($totalAmount);
+        $discountPercentage = $rule->discount_type === 'percentage' 
+            ? $rule->discount_percentage 
+            : ($discountAmount / $totalAmount) * 100;
+        
+        return [
+            'percentage' => round($discountPercentage, 2),
+            'amount' => $discountAmount,
+            'rule' => $rule
+        ];
+    }
+    
+    /**
+     * Legacy bundle discount for backward compatibility
+     */
+    protected function getLegacyBundleDiscount($productCount)
     {
         switch ($productCount) {
             case 2:

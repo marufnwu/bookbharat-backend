@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\DeliveryOptionController;
 use App\Http\Controllers\Admin\ShippingInsuranceController;
 use App\Http\Controllers\Admin\ConfigurationController;
 use App\Http\Controllers\Admin\ContentController;
+use App\Http\Controllers\Admin\BundleDiscountController;
 
 /*
 |--------------------------------------------------------------------------
@@ -70,6 +71,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/{id}/frequently-bought-together', [ProductController::class, 'getFrequentlyBoughtTogether']);
         Route::get('/category/{categoryId}', [ProductController::class, 'byCategory']);
     });
+
+    // Bundle Discount Rules (Public - for display)
+    Route::get('/bundle-discounts/active', [BundleDiscountController::class, 'getActiveRules']);
 
     // Category Routes (Public)
     Route::get('/categories', [CategoryController::class, 'index']);
@@ -240,6 +244,17 @@ Route::prefix('v1')->group(function () {
             Route::get('/all', [OrderController::class, 'adminIndex']);
             Route::put('/{id}/status', [OrderController::class, 'updateStatus']);
             Route::put('/{id}/payment-status', [OrderController::class, 'updatePaymentStatus']);
+        });
+
+        // Bundle Discount Management
+        Route::prefix('bundle-discounts')->group(function () {
+            Route::get('/', [BundleDiscountController::class, 'index']);
+            Route::post('/', [BundleDiscountController::class, 'store']);
+            Route::get('/{id}', [BundleDiscountController::class, 'show']);
+            Route::put('/{id}', [BundleDiscountController::class, 'update']);
+            Route::delete('/{id}', [BundleDiscountController::class, 'destroy']);
+            Route::post('/{id}/toggle-active', [BundleDiscountController::class, 'toggleActive']);
+            Route::post('/preview', [BundleDiscountController::class, 'previewDiscount']);
         });
 
         // Dashboard & Analytics
