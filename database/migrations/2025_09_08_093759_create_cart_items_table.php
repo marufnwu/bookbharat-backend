@@ -15,9 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('cart_id')->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
+            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->onDelete('set null');
             $table->integer('quantity');
             $table->decimal('unit_price', 10, 2);
-            $table->json('product_attributes')->nullable();
+            $table->json('attributes')->nullable();
             $table->timestamps();
 
             $table->index(['cart_id', 'product_id']);

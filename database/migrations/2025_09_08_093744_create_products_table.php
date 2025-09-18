@@ -29,9 +29,13 @@ return new class extends Migration
             $table->string('dimensions')->nullable();
             $table->foreignId('category_id')->constrained()->onDelete('cascade');
             $table->string('brand')->nullable();
+            $table->string('author')->nullable();
             $table->string('status')->default('draft'); // draft, active, inactive
+            $table->decimal('rating', 2, 1)->default(0);
             $table->boolean('is_featured')->default(false);
+            $table->boolean('is_bestseller')->default(false);
             $table->boolean('is_digital')->default(false);
+            $table->unsignedInteger('sales_count')->default(0);
             $table->json('attributes')->nullable(); // color, size, etc.
             $table->json('metadata')->nullable();
             $table->json('seo')->nullable(); // meta title, description, keywords
@@ -40,6 +44,10 @@ return new class extends Migration
             $table->index(['status', 'is_featured']);
             $table->index(['category_id', 'status']);
             $table->index('stock_quantity');
+            $table->index('author');
+            $table->index('is_bestseller');
+            $table->index('rating');
+            $table->index('sales_count');
         });
     }
 

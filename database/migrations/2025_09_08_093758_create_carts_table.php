@@ -15,6 +15,16 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('session_id')->nullable();
+            $table->string('status')->default('active');
+            $table->string('currency', 3)->default('INR');
+            $table->decimal('subtotal', 10, 2)->default(0);
+            $table->decimal('tax_amount', 10, 2)->default(0);
+            $table->decimal('shipping_cost', 10, 2)->default(0);
+            $table->decimal('total', 10, 2)->default(0);
+            $table->integer('total_items')->default(0);
+            $table->string('coupon_code')->nullable();
+            $table->decimal('coupon_discount', 10, 2)->default(0);
+            $table->boolean('coupon_free_shipping')->default(false);
             $table->timestamps();
 
             $table->index(['user_id']);

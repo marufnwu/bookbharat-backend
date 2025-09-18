@@ -20,11 +20,18 @@ return new class extends Migration
             $table->string('company')->nullable();
             $table->string('address_line_1');
             $table->string('address_line_2')->nullable();
+            $table->string('village_city_area')->nullable();
+            $table->string('house_number')->nullable();
+            $table->string('landmark')->nullable();
             $table->string('city');
+            $table->string('zila')->nullable(); // District/Zila
             $table->string('state');
+            $table->string('post_name')->nullable();
             $table->string('postal_code');
+            $table->string('pincode', 6)->nullable(); // Use pincode instead of postal_code
             $table->string('country')->default('India');
             $table->string('phone')->nullable();
+            $table->string('whatsapp_number')->nullable();
             $table->boolean('is_default')->default(false);
             $table->timestamps();
 

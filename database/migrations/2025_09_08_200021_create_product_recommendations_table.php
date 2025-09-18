@@ -23,9 +23,9 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['user_id', 'product_id', 'is_active']);
-            $table->index(['recommendation_type', 'confidence_score']);
-            $table->index(['recommended_product_id', 'conversion_rate']);
+            $table->index(['user_id', 'product_id', 'is_active'], 'prod_rec_user_product_active_idx');
+            $table->index(['recommendation_type', 'confidence_score'], 'prod_rec_type_confidence_idx');
+            $table->index(['recommended_product_id', 'conversion_rate'], 'prod_rec_product_conversion_idx');
         });
     }
 
