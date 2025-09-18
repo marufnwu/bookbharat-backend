@@ -30,7 +30,7 @@ return new class extends Migration
             $table->timestamps();
             
             $table->index(['is_active', 'code']);
-            $table->index(['min_order_value', 'availability_zones']);
+            $table->index(['min_order_value']);
         });
     }
 
