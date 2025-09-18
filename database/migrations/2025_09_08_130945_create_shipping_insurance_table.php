@@ -27,7 +27,7 @@ return new class extends Migration
             $table->integer('claim_processing_days')->default(7); // Days to process claims
             $table->timestamps();
             
-            $table->index(['is_active', 'min_order_value', 'max_order_value']);
+            $table->index(['is_active', 'min_order_value', 'max_order_value'], 'shipping_insurance_order_value_idx');
         });
     }
 
