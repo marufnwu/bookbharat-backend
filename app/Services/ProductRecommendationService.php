@@ -184,7 +184,7 @@ class ProductRecommendationService
     /**
      * Calculate bundle price and savings
      */
-    protected function calculateBundlePrice($mainProduct, $additionalProducts)
+    public function calculateBundlePrice($mainProduct, $additionalProducts)
     {
         $products = collect([$mainProduct])->concat($additionalProducts);
         
