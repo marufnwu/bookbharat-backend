@@ -22,7 +22,7 @@ class ConfigurationController extends Controller
                     'description' => 'India\'s Premier Online Bookstore',
                     'logo' => asset('images/logo.png'),
                     'favicon' => asset('images/favicon.ico'),
-                    'contact_email' => 'support@bookbharat.com',
+                    'contact_email' => 'support@bookbharaqqqt.com',
                     'contact_phone' => '+91 9876543210',
                     'address' => [
                         'line1' => 'BookBharat HQ',
