@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\Coupon;
 use App\Models\CustomerGroup;
 // use App\Models\LoyaltyProgram;
@@ -109,6 +110,44 @@ class SystemTestSeeder extends Seeder
     private function createProducts()
     {
         $categories = Category::all();
+
+        // Use local storage URLs for book images
+        $baseUrl = config('app.url') . '/storage/book-covers/';
+
+        // Create placeholder image paths using local storage
+        $bookImages = [
+            'fiction' => [
+                $baseUrl . 'placeholder-fiction-1.jpg',
+                $baseUrl . 'placeholder-fiction-2.jpg',
+                $baseUrl . 'placeholder-fiction-3.jpg'
+            ],
+            'non-fiction' => [
+                $baseUrl . 'placeholder-nonfiction-1.jpg',
+                $baseUrl . 'placeholder-nonfiction-2.jpg',
+                $baseUrl . 'placeholder-nonfiction-3.jpg'
+            ],
+            'mystery' => [
+                $baseUrl . 'placeholder-mystery-1.jpg',
+                $baseUrl . 'placeholder-mystery-2.jpg',
+                $baseUrl . 'placeholder-mystery-3.jpg'
+            ],
+            'romance' => [
+                $baseUrl . 'placeholder-romance-1.jpg',
+                $baseUrl . 'placeholder-romance-2.jpg',
+                $baseUrl . 'placeholder-romance-3.jpg'
+            ],
+            'scifi' => [
+                $baseUrl . 'placeholder-scifi-1.jpg',
+                $baseUrl . 'placeholder-scifi-2.jpg',
+                $baseUrl . 'placeholder-scifi-3.jpg'
+            ],
+            'biography' => [
+                $baseUrl . 'placeholder-biography-1.jpg',
+                $baseUrl . 'placeholder-biography-2.jpg',
+                $baseUrl . 'placeholder-biography-3.jpg'
+            ]
+        ];
+
         $products = [
             [
                 'name' => 'The Great Indian Novel',
@@ -333,10 +372,67 @@ class SystemTestSeeder extends Seeder
         ];
 
         foreach ($products as $productData) {
-            Product::firstOrCreate(
+            $product = Product::firstOrCreate(
                 ['sku' => $productData['sku']],
                 $productData
             );
+
+            // Add product images if they don't exist
+            if ($product->images()->count() == 0) {
+                // Determine which image set to use based on category
+                $categorySlug = $product->category->slug ?? 'fiction';
+                $imageSet = 'fiction'; // Default
+
+                if (str_contains($categorySlug, 'fiction')) {
+                    $imageSet = 'fiction';
+                } elseif (str_contains($categorySlug, 'non-fiction')) {
+                    $imageSet = 'non-fiction';
+                } elseif (str_contains($categorySlug, 'mystery') || str_contains($categorySlug, 'thriller')) {
+                    $imageSet = 'mystery';
+                } elseif (str_contains($categorySlug, 'romance')) {
+                    $imageSet = 'romance';
+                } elseif (str_contains($categorySlug, 'science-fiction')) {
+                    $imageSet = 'scifi';
+                } elseif (str_contains($categorySlug, 'biography')) {
+                    $imageSet = 'biography';
+                }
+
+                // Get appropriate images for this book type
+                $images = $bookImages[$imageSet] ?? $bookImages['fiction'];
+
+                // Add primary image with book title
+                $primaryImageUrl = str_replace(
+                    '?text=' . urlencode(ucfirst($imageSet) . '+Book'),
+                    '?text=' . urlencode(str_replace(['-', '_'], ' ', $product->slug)),
+                    $images[0]
+                );
+
+                $product->images()->create([
+                    'image_path' => $primaryImageUrl,
+                    'alt_text' => $product->name . ' - Cover',
+                    'sort_order' => 1,
+                    'is_primary' => true
+                ]);
+
+                // Add secondary images (back cover, inside pages)
+                if (count($images) > 1) {
+                    $product->images()->create([
+                        'image_path' => $images[1],
+                        'alt_text' => $product->name . ' - Back Cover',
+                        'sort_order' => 2,
+                        'is_primary' => false
+                    ]);
+                }
+
+                if (count($images) > 2) {
+                    $product->images()->create([
+                        'image_path' => $images[2],
+                        'alt_text' => $product->name . ' - Sample Page',
+                        'sort_order' => 3,
+                        'is_primary' => false
+                    ]);
+                }
+            }
         }
     }
 
@@ -388,12 +484,12 @@ class SystemTestSeeder extends Seeder
         foreach ($users as $userData) {
             $group = $userData['group'];
             unset($userData['group']);
-            
+
             $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
-            
+
             if ($group && !$user->customerGroups()->where('customer_group_id', $group->id)->exists()) {
                 $user->customerGroups()->attach($group->id);
             }

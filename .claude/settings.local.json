@@ -1,16 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Read(//d/bookbharat-v2/**)",
-      "Bash(npm run dev:*)",
-      "Bash(sed:*)",
-      "Bash(while read file)",
-      "Bash(do sed -i \"s/import { useAuthStore } from ''''@\\/stores\\/auth'''';/import { useHydratedAuth } from ''''@\\/stores\\/auth'''';/g\" \"$file\")",
-      "Bash(done)",
-      "Bash(for:*)",
-      "Bash(do)",
-      "Bash(mv:*)",
-      "Bash(php artisan:*)"
+      "Bash(curl:*)",
+      "Bash(php:*)",
+      "Bash(echo:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

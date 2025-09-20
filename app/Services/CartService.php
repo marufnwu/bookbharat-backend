@@ -157,7 +157,7 @@ class CartService
         if ($userId) {
             // For authenticated users, first look for carts by user_id
             // This covers both user-only carts and user+session carts
-            $cart = Cart::with(['items.product', 'items.variant'])
+            $cart = Cart::with(['items.product.images', 'items.variant'])
                 ->where('user_id', $userId)
                 ->first();
             
@@ -170,7 +170,7 @@ class CartService
             // Fallback: if no user cart found and session provided,
             // look for session cart that could be converted to user cart
             if ($sessionId) {
-                $cart = Cart::with(['items.product', 'items.variant'])
+                $cart = Cart::with(['items.product.images', 'items.variant'])
                     ->where('session_id', $sessionId)
                     ->whereNull('user_id')
                     ->first();
@@ -180,7 +180,7 @@ class CartService
             }
         } else if ($sessionId) {
             // For guest users, look for session-based carts
-            $cart = Cart::with(['items.product', 'items.variant'])
+            $cart = Cart::with(['items.product.images', 'items.variant'])
                 ->where('session_id', $sessionId)
                 ->whereNull('user_id')
                 ->first();
