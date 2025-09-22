@@ -3,71 +3,36 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Models\PaymentConfiguration;
+use App\Models\Payment;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Config;
-use Razorpay\Api\Api as RazorpayApi;
-use Cashfree\Cashfree;
 
 class PaymentService
 {
-    protected $razorpayApi;
-    protected $cashfreeApi;
-    
     public function __construct()
     {
-        // Initialize Razorpay API
-        if (config('services.razorpay.key') && config('services.razorpay.secret')) {
-            $this->razorpayApi = new RazorpayApi(
-                config('services.razorpay.key'),
-                config('services.razorpay.secret')
-            );
-        }
-        
-        // Initialize Cashfree
-        if (config('services.cashfree.client_id') && config('services.cashfree.client_secret')) {
-            Cashfree::$XClientId = config('services.cashfree.client_id');
-            Cashfree::$XClientSecret = config('services.cashfree.client_secret');
-            Cashfree::$XEnvironment = config('services.cashfree.environment', 'TEST');
-        }
+        // Using unified payment gateway system - no initialization needed
     }
 
     public function processPayment(Order $order, string $paymentMethod, array $additionalData = [])
     {
         try {
-            // Get payment configuration
-            $config = PaymentConfiguration::where('payment_method', $paymentMethod)
-                ->where('is_enabled', true)
-                ->first();
+            // Use unified payment gateway system
+            $gateway = \App\Services\Payment\PaymentGatewayFactory::create($paymentMethod);
 
-            if (!$config) {
+            if (!$gateway || !$gateway->isAvailable()) {
                 throw new \Exception("Payment method '{$paymentMethod}' is not available");
             }
 
-            // Check if payment method is available for this order
-            if (!$config->isAvailableForOrder($order->total_amount)) {
-                throw new \Exception("Payment method '{$paymentMethod}' is not available for this order amount");
-            }
+            $result = $gateway->initiatePayment($order, $additionalData);
 
-            switch ($paymentMethod) {
-                case 'cod':
-                case 'cod_with_advance':
-                case 'cod_percentage_advance':
-                    return $this->processCODVariants($order, $config);
-                
-                case 'razorpay':
-                    return $this->processRazorpay($order, $additionalData);
-                
-                case 'cashfree':
-                    return $this->processCashfree($order, $additionalData);
-                
-                case 'bank_transfer':
-                    return $this->processBankTransfer($order, $config);
-                
-                default:
-                    throw new \Exception('Invalid payment method');
-            }
+            // Format the response for consistency
+            return [
+                'status' => $result['success'] ? 'pending' : 'failed',
+                'transaction_id' => $result['payment_id'] ?? null,
+                'payment_method' => $paymentMethod,
+                'message' => $result['message'] ?? 'Payment initiated',
+                'payment_data' => $result
+            ];
         } catch (\Exception $e) {
             Log::error('Payment processing failed', [
                 'order_id' => $order->id,
@@ -79,219 +44,7 @@ class PaymentService
         }
     }
 
-    protected function processCODVariants(Order $order, PaymentConfiguration $config)
-    {
-        $advanceAmount = $config->getAdvancePaymentAmount($order->total_amount);
-        $codAmount = $order->total_amount - $advanceAmount;
-        
-        $result = [
-            'status' => $advanceAmount > 0 ? 'advance_required' : 'pending',
-            'transaction_id' => 'COD_' . $order->id . '_' . time(),
-            'payment_method' => $config->payment_method,
-            'message' => $config->requiresAdvancePayment() 
-                ? "Pay advance amount of ₹{$advanceAmount} online, remaining ₹{$codAmount} on delivery"
-                : 'Cash on delivery order placed successfully',
-            'payment_data' => [
-                'method' => $config->payment_method,
-                'advance_amount' => $advanceAmount,
-                'cod_amount' => $codAmount,
-                'total_amount' => $order->total_amount,
-                'service_charges' => $config->configuration['service_charges'] ?? null,
-                'created_at' => now()
-            ]
-        ];
-
-        // If advance payment required, create Razorpay order for advance amount
-        if ($advanceAmount > 0) {
-            try {
-                if (!$this->razorpayApi) {
-                    throw new \Exception('Razorpay API not configured for advance payment');
-                }
-
-                $razorpayOrder = $this->razorpayApi->order->create([
-                    'receipt' => 'advance_' . $order->id,
-                    'amount' => $advanceAmount * 100, // Amount in paise
-                    'currency' => $order->currency ?? 'INR',
-                    'payment_capture' => 1,
-                    'notes' => [
-                        'order_id' => $order->id,
-                        'payment_type' => 'cod_advance',
-                        'advance_amount' => $advanceAmount,
-                        'cod_amount' => $codAmount
-                    ]
-                ]);
-
-                $result['advance_payment'] = [
-                    'gateway_order_id' => $razorpayOrder['id'],
-                    'amount' => $advanceAmount,
-                    'razorpay_key' => config('services.razorpay.key'),
-                    'checkout_data' => [
-                        'key' => config('services.razorpay.key'),
-                        'order_id' => $razorpayOrder['id'],
-                        'amount' => $razorpayOrder['amount'],
-                        'currency' => $razorpayOrder['currency'],
-                        'name' => config('app.name'),
-                        'description' => 'Advance payment for Order #' . $order->order_number,
-                        'prefill' => [
-                            'name' => $order->user->name,
-                            'email' => $order->user->email,
-                            'contact' => $order->billing_address['phone'] ?? $order->shipping_address['phone'] ?? $order->user->phone
-                        ]
-                    ]
-                ];
-
-            } catch (\Exception $e) {
-                Log::error('COD Advance payment setup failed', [
-                    'order_id' => $order->id,
-                    'error' => $e->getMessage()
-                ]);
-                throw new \Exception('Unable to setup advance payment: ' . $e->getMessage());
-            }
-        }
-
-        return $result;
-    }
-
-    protected function processBankTransfer(Order $order, PaymentConfiguration $config)
-    {
-        $bankDetails = $config->configuration['bank_details'] ?? [];
-        
-        return [
-            'status' => 'pending_verification',
-            'transaction_id' => 'BANK_' . $order->id . '_' . time(),
-            'payment_method' => 'bank_transfer',
-            'message' => 'Transfer the amount to our bank account and upload payment proof',
-            'payment_data' => [
-                'method' => 'bank_transfer',
-                'bank_details' => $bankDetails,
-                'amount' => $order->total_amount,
-                'verification_required' => $config->configuration['verification_required'] ?? true,
-                'created_at' => now()
-            ],
-            'bank_details' => $bankDetails
-        ];
-    }
-
-    protected function processRazorpay(Order $order, array $additionalData = [])
-    {
-        try {
-            if (!$this->razorpayApi) {
-                throw new \Exception('Razorpay API not configured');
-            }
-            
-            // Create Razorpay order
-            $razorpayOrder = $this->razorpayApi->order->create([
-                'receipt' => 'order_' . $order->id,
-                'amount' => $order->total_amount * 100, // Amount in paise
-                'currency' => $order->currency ?? 'INR',
-                'payment_capture' => 1,
-                'notes' => [
-                    'order_id' => $order->id,
-                    'customer_id' => $order->user_id,
-                    'merchant_order_id' => $order->order_number
-                ]
-            ]);
-            
-            return [
-                'status' => 'pending',
-                'transaction_id' => $razorpayOrder['id'],
-                'payment_method' => 'razorpay',
-                'key_id' => config('services.razorpay.key'),
-                'order_id' => $razorpayOrder['id'],
-                'amount' => $razorpayOrder['amount'],
-                'currency' => $razorpayOrder['currency'],
-                'name' => config('app.name'),
-                'description' => 'Order #' . $order->order_number,
-                'prefill' => [
-                    'name' => $order->user->name,
-                    'email' => $order->user->email,
-                    'contact' => $order->shipping_phone ?? $order->user->phone
-                ],
-                'payment_data' => [
-                    'method' => 'razorpay',
-                    'gateway_order_id' => $razorpayOrder['id'],
-                    'receipt' => $razorpayOrder['receipt'],
-                    'created_at' => now(),
-                    'razorpay_response' => $razorpayOrder->toArray()
-                ],
-                'message' => 'Razorpay payment initiated successfully'
-            ];
-            
-        } catch (\Exception $e) {
-            Log::error('Razorpay payment creation failed', [
-                'order_id' => $order->id,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
-
-    protected function processCashfree(Order $order, array $additionalData = [])
-    {
-        try {
-            if (!config('services.cashfree.client_id') || !config('services.cashfree.client_secret')) {
-                throw new \Exception('Cashfree API not configured');
-            }
-            
-            $customerDetails = [
-                'customer_id' => (string)$order->user_id,
-                'customer_name' => $order->user->name,
-                'customer_email' => $order->user->email,
-                'customer_phone' => $order->shipping_phone ?? $order->user->phone ?? '+919999999999'
-            ];
-            
-            $orderData = [
-                'order_id' => 'CF_' . $order->id . '_' . time(),
-                'order_amount' => (float)$order->total_amount,
-                'order_currency' => $order->currency ?? 'INR',
-                'order_note' => 'Order #' . $order->order_number,
-                'customer_details' => $customerDetails,
-                'order_meta' => [
-                    'return_url' => route('payment.callback.cashfree', ['order_id' => $order->id]),
-                    'notify_url' => route('webhook.cashfree')
-                ]
-            ];
-            
-            // Create Cashfree order using HTTP client
-            $response = Http::withHeaders([
-                'X-Client-Id' => config('services.cashfree.client_id'),
-                'X-Client-Secret' => config('services.cashfree.client_secret'),
-                'x-api-version' => '2022-09-01',
-                'Content-Type' => 'application/json'
-            ])->post(config('services.cashfree.base_url') . '/orders', $orderData);
-            
-            if (!$response->successful()) {
-                throw new \Exception('Cashfree order creation failed: ' . $response->body());
-            }
-            
-            $cashfreeOrder = $response->json();
-            
-            return [
-                'status' => 'pending',
-                'transaction_id' => $orderData['order_id'],
-                'cf_order_id' => $cashfreeOrder['cf_order_id'] ?? null,
-                'payment_method' => 'cashfree',
-                'payment_session_id' => $cashfreeOrder['payment_session_id'] ?? null,
-                'order_token' => $cashfreeOrder['order_token'] ?? null,
-                'checkout_url' => $cashfreeOrder['payment_link'] ?? null,
-                'payment_data' => [
-                    'method' => 'cashfree',
-                    'gateway_order_id' => $orderData['order_id'],
-                    'cf_order_id' => $cashfreeOrder['cf_order_id'] ?? null,
-                    'created_at' => now(),
-                    'cashfree_response' => $cashfreeOrder
-                ],
-                'message' => 'Cashfree payment initiated successfully'
-            ];
-            
-        } catch (\Exception $e) {
-            Log::error('Cashfree payment creation failed', [
-                'order_id' => $order->id,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
+    // Old payment processing methods removed - using unified gateway system
 
     public function updatePaymentStatus($transactionId, $status, $gatewayData = [])
     {
@@ -334,187 +87,55 @@ class PaymentService
     public function refundPayment($paymentId, $amount = null, $reason = 'order_cancellation')
     {
         $payment = Payment::findOrFail($paymentId);
-        
+
         if ($payment->status !== 'completed') {
             throw new \Exception('Cannot refund incomplete payment');
         }
 
         $refundAmount = $amount ?? $payment->amount;
-        
-        // Create refund record
-        $refund = PaymentRefund::create([
-            'payment_id' => $payment->id,
-            'amount' => $refundAmount,
-            'status' => 'processing',
-            'refund_data' => [
-                'initiated_at' => now(),
-                'reason' => $reason,
-                'requested_amount' => $refundAmount
-            ]
-        ]);
 
-        // Process actual refund based on payment method
+        // Use unified gateway system for refunds
         try {
-            switch ($payment->payment_method) {
-                case 'cod':
-                    // COD refunds are handled manually
-                    $refund->update(['status' => 'manual']);
-                    break;
-                    
-                case 'razorpay':
-                    $this->processRazorpayRefund($payment, $refund, $refundAmount);
-                    break;
-                    
-                case 'cashfree':
-                    $this->processCashfreeRefund($payment, $refund, $refundAmount);
-                    break;
-            }
-        } catch (\Exception $e) {
-            $refund->update([
-                'status' => 'failed',
-                'refund_data' => array_merge($refund->refund_data ?? [], [
-                    'error' => $e->getMessage(),
-                    'failed_at' => now()
-                ])
-            ]);
-            throw $e;
-        }
+            $gateway = \App\Services\Payment\PaymentGatewayFactory::create($payment->gateway);
 
-        return $refund;
-    }
-    
-    protected function processRazorpayRefund($payment, $refund, $refundAmount)
-    {
-        if (!$this->razorpayApi) {
-            throw new \Exception('Razorpay API not configured');
-        }
-        
-        $gatewayPaymentId = $payment->payment_data['gateway_payment_id'] ?? null;
-        if (!$gatewayPaymentId) {
-            throw new \Exception('Gateway payment ID not found');
-        }
-        
-        try {
-            $razorpayRefund = $this->razorpayApi->refund->create([
-                'payment_id' => $gatewayPaymentId,
-                'amount' => $refundAmount * 100, // Amount in paise
-                'speed' => 'normal',
-                'notes' => [
-                    'refund_id' => $refund->id,
-                    'reason' => $refund->refund_data['reason'] ?? 'order_cancellation'
-                ]
+            if (!$gateway) {
+                throw new \Exception("Payment gateway '{$payment->gateway}' not available for refund");
+            }
+
+            $refundResult = $gateway->refundPayment($paymentId, $refundAmount, [
+                'reason' => $reason
             ]);
-            
-            $refund->update([
-                'status' => 'completed',
-                'refund_data' => array_merge($refund->refund_data ?? [], [
-                    'gateway_refund_id' => $razorpayRefund['id'],
-                    'gateway_response' => $razorpayRefund->toArray(),
-                    'completed_at' => now()
-                ])
-            ]);
-            
+
+            return $refundResult;
+
         } catch (\Exception $e) {
-            Log::error('Razorpay refund failed', [
-                'payment_id' => $payment->id,
-                'refund_id' => $refund->id,
+            Log::error('Refund failed', [
+                'payment_id' => $paymentId,
+                'amount' => $refundAmount,
                 'error' => $e->getMessage()
             ]);
             throw $e;
         }
     }
     
-    protected function processCashfreeRefund($payment, $refund, $refundAmount)
+    /**
+     * Verify payment using unified gateway system
+     */
+    public function verifyPayment($paymentId)
     {
-        $gatewayOrderId = $payment->payment_data['gateway_order_id'] ?? null;
-        if (!$gatewayOrderId) {
-            throw new \Exception('Gateway order ID not found');
-        }
-        
         try {
-            $refundData = [
-                'refund_amount' => (float)$refundAmount,
-                'refund_id' => 'refund_' . $refund->id . '_' . time(),
-                'refund_note' => $refund->refund_data['reason'] ?? 'order_cancellation'
-            ];
-            
-            $response = Http::withHeaders([
-                'X-Client-Id' => config('services.cashfree.client_id'),
-                'X-Client-Secret' => config('services.cashfree.client_secret'),
-                'x-api-version' => '2022-09-01',
-                'Content-Type' => 'application/json'
-            ])->post(config('services.cashfree.base_url') . '/orders/' . $gatewayOrderId . '/refunds', $refundData);
-            
-            if (!$response->successful()) {
-                throw new \Exception('Cashfree refund failed: ' . $response->body());
+            $payment = Payment::findOrFail($paymentId);
+            $gateway = \App\Services\Payment\PaymentGatewayFactory::create($payment->gateway);
+
+            if (!$gateway) {
+                throw new \Exception("Payment gateway '{$payment->gateway}' not available");
             }
-            
-            $cashfreeRefund = $response->json();
-            
-            $refund->update([
-                'status' => 'completed',
-                'refund_data' => array_merge($refund->refund_data ?? [], [
-                    'gateway_refund_id' => $refundData['refund_id'],
-                    'cf_refund_id' => $cashfreeRefund['cf_refund_id'] ?? null,
-                    'gateway_response' => $cashfreeRefund,
-                    'completed_at' => now()
-                ])
-            ]);
-            
+
+            return $gateway->verifyPayment($paymentId);
+
         } catch (\Exception $e) {
-            Log::error('Cashfree refund failed', [
-                'payment_id' => $payment->id,
-                'refund_id' => $refund->id,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
-    
-    public function verifyRazorpayPayment($razorpayOrderId, $razorpayPaymentId, $razorpaySignature)
-    {
-        if (!$this->razorpayApi) {
-            throw new \Exception('Razorpay API not configured');
-        }
-        
-        try {
-            $attributes = [
-                'razorpay_order_id' => $razorpayOrderId,
-                'razorpay_payment_id' => $razorpayPaymentId,
-                'razorpay_signature' => $razorpaySignature
-            ];
-            
-            $this->razorpayApi->utility->verifyPaymentSignature($attributes);
-            return true;
-            
-        } catch (\Exception $e) {
-            Log::error('Razorpay signature verification failed', [
-                'order_id' => $razorpayOrderId,
-                'payment_id' => $razorpayPaymentId,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
-    
-    public function verifyCashfreePayment($orderId)
-    {
-        try {
-            $response = Http::withHeaders([
-                'X-Client-Id' => config('services.cashfree.client_id'),
-                'X-Client-Secret' => config('services.cashfree.client_secret'),
-                'x-api-version' => '2022-09-01'
-            ])->get(config('services.cashfree.base_url') . '/orders/' . $orderId . '/payments');
-            
-            if (!$response->successful()) {
-                throw new \Exception('Cashfree payment verification failed: ' . $response->body());
-            }
-            
-            return $response->json();
-            
-        } catch (\Exception $e) {
-            Log::error('Cashfree payment verification failed', [
-                'order_id' => $orderId,
+            Log::error('Payment verification failed', [
+                'payment_id' => $paymentId,
                 'error' => $e->getMessage()
             ]);
             return false;

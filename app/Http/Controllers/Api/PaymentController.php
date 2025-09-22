@@ -3,63 +3,40 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\PaymentService;
+use App\Services\Payment\PaymentGatewayFactory;
+use App\Services\CartService;
+use App\Services\OrderService;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\PaymentConfiguration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
-    protected $paymentService;
+    protected $cartService;
+    protected $orderService;
 
-    public function __construct(PaymentService $paymentService)
+    public function __construct(CartService $cartService, OrderService $orderService)
     {
-        $this->paymentService = $paymentService;
+        $this->cartService = $cartService;
+        $this->orderService = $orderService;
     }
 
     /**
-     * Get available payment methods for checkout
+     * Get available payment gateways
      */
     public function getAvailablePaymentMethods(Request $request)
     {
-        $orderAmount = $request->query('amount', 0);
-        
         try {
-            $methods = PaymentConfiguration::getEnabledMethods($orderAmount);
-            
-            $formattedMethods = $methods->map(function($method) use ($orderAmount) {
-                $data = [
-                    'payment_method' => $method->payment_method,
-                    'display_name' => $method->display_name,
-                    'description' => $method->description,
-                    'priority' => $method->priority,
-                ];
+            $amount = $request->query('amount', 0);
+            $currency = $request->query('currency', 'INR');
 
-                // Add specific configuration for COD methods
-                if (str_contains($method->payment_method, 'cod')) {
-                    $advanceAmount = $method->getAdvancePaymentAmount($orderAmount);
-                    $data['advance_payment'] = [
-                        'required' => $method->requiresAdvancePayment(),
-                        'amount' => $advanceAmount,
-                        'cod_amount' => $orderAmount - $advanceAmount,
-                        'service_charges' => $method->configuration['service_charges'] ?? null
-                    ];
-                }
-
-                // Add bank details for bank transfer
-                if ($method->payment_method === 'bank_transfer') {
-                    $data['bank_details'] = $method->configuration['bank_details'] ?? [];
-                }
-
-                return $data;
-            });
+            $gateways = PaymentGatewayFactory::getGatewaysForOrder($amount, $currency);
 
             return response()->json([
                 'success' => true,
-                'payment_methods' => $formattedMethods->values()
+                'gateways' => $gateways
             ]);
 
         } catch (\Exception $e) {
@@ -75,349 +52,217 @@ class PaymentController extends Controller
     }
 
     /**
-     * Initiate payment for an order
+     * Handle payment gateway callback (frontend redirect)
+     * This is called when user is redirected back from payment gateway
      */
-    public function initiatePayment(Request $request)
+    public function callback(Request $request, $gateway)
     {
-        $validator = Validator::make($request->all(), [
-            'order_id' => 'required|exists:orders,id',
-            'payment_method' => 'required|in:cod,razorpay,cashfree',
-            'return_url' => 'sometimes|url',
-            'cancel_url' => 'sometimes|url'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         try {
-            $order = Order::findOrFail($request->order_id);
-            
-            // Check if user can access this order
-            if ($order->user_id !== auth()->id()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized access to order'
-                ], 403);
+            Log::info("Payment callback received for {$gateway}", $request->all());
+
+            $gatewayInstance = PaymentGatewayFactory::create($gateway);
+            if (!$gatewayInstance) {
+                throw new \Exception("Payment gateway {$gateway} not found");
             }
 
-            // Check if payment is already completed
-            if ($order->payment_status === 'completed') {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Payment already completed for this order'
-                ], 400);
+            // Process the callback
+            $result = $gatewayInstance->processCallback($request);
+
+            if ($result['success']) {
+                // Find the order
+                $orderId = $result['order_id'] ?? $request->input('order_id');
+                $order = Order::find($orderId);
+
+                if ($order && $result['payment_status'] === 'completed') {
+                    // Payment successful - clear cart
+                    $sessionId = $request->header('X-Session-ID');
+                    $this->cartService->clearCart($order->user_id, $sessionId);
+
+                    // Start order workflow
+                    $this->orderService->processOrderCreated($order);
+
+                    // Redirect to success page
+                    $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+                    return redirect("{$frontendUrl}/payment/success?order_id={$order->order_number}");
+                }
             }
 
-            $additionalData = [
-                'return_url' => $request->return_url,
-                'cancel_url' => $request->cancel_url
-            ];
+            // Payment failed or pending - redirect to appropriate page
+            $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+            $status = $result['payment_status'] ?? 'failed';
+            $orderId = $result['order_id'] ?? '';
 
-            $paymentData = $this->paymentService->processPayment(
-                $order, 
-                $request->payment_method, 
-                $additionalData
-            );
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment initiated successfully',
-                'data' => $paymentData
-            ], 200);
+            if ($status === 'pending') {
+                return redirect("{$frontendUrl}/payment/pending?order_id={$orderId}");
+            } else {
+                return redirect("{$frontendUrl}/payment/failed?order_id={$orderId}&reason=" . urlencode($result['message'] ?? 'Payment failed'));
+            }
 
         } catch (\Exception $e) {
-            Log::error('Payment initiation failed', [
-                'order_id' => $request->order_id,
-                'payment_method' => $request->payment_method,
-                'error' => $e->getMessage()
+            Log::error("Payment callback error for {$gateway}", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment initiation failed: ' . $e->getMessage()
-            ], 500);
+            $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+            return redirect("{$frontendUrl}/payment/failed?error=" . urlencode($e->getMessage()));
         }
     }
 
     /**
-     * Handle Razorpay payment callback
-     */
-    public function razorpayCallback(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'razorpay_order_id' => 'required|string',
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_signature' => 'required|string'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Invalid payment response',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            // Verify payment signature
-            $isValid = $this->paymentService->verifyRazorpayPayment(
-                $request->razorpay_order_id,
-                $request->razorpay_payment_id,
-                $request->razorpay_signature
-            );
-
-            if (!$isValid) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Payment verification failed'
-                ], 400);
-            }
-
-            // Update payment status
-            $payment = $this->paymentService->updatePaymentStatus(
-                $request->razorpay_order_id,
-                'completed',
-                $request->all()
-            );
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment verified and updated successfully',
-                'data' => [
-                    'payment_id' => $payment->id,
-                    'order_id' => $payment->order_id,
-                    'status' => $payment->status
-                ]
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('Razorpay callback processing failed', [
-                'razorpay_order_id' => $request->razorpay_order_id,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment callback processing failed'
-            ], 500);
-        }
-    }
-
-    /**
-     * Handle Cashfree payment callback
-     */
-    public function cashfreeCallback(Request $request, $orderId)
-    {
-        try {
-            // Verify payment with Cashfree
-            $paymentData = $this->paymentService->verifyCashfreePayment($orderId);
-
-            if (!$paymentData) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Payment verification failed'
-                ], 400);
-            }
-
-            // Determine payment status based on Cashfree response
-            $status = 'failed';
-            if (!empty($paymentData) && isset($paymentData[0]['payment_status'])) {
-                $cfStatus = $paymentData[0]['payment_status'];
-                $status = ($cfStatus === 'SUCCESS') ? 'completed' : 'failed';
-            }
-
-            // Update payment status
-            $payment = $this->paymentService->updatePaymentStatus(
-                $orderId,
-                $status,
-                ['cashfree_response' => $paymentData]
-            );
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment verified and updated successfully',
-                'data' => [
-                    'payment_id' => $payment->id,
-                    'order_id' => $payment->order_id,
-                    'status' => $payment->status
-                ]
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('Cashfree callback processing failed', [
-                'order_id' => $orderId,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment callback processing failed'
-            ], 500);
-        }
-    }
-
-    /**
-     * Handle payment webhook (for server-to-server notifications)
+     * Handle payment gateway webhook (backend notification)
+     * This is called by payment gateway to notify payment status
      */
     public function webhook(Request $request, $gateway)
     {
         try {
-            switch ($gateway) {
-                case 'razorpay':
-                    return $this->handleRazorpayWebhook($request);
-                case 'cashfree':
-                    return $this->handleCashfreeWebhook($request);
-                default:
-                    return response()->json(['status' => 'error', 'message' => 'Invalid gateway'], 400);
+            Log::info("Payment webhook received for {$gateway}", $request->all());
+
+            // For PayU, always return 200 OK to prevent retries
+            $alwaysReturn200 = in_array($gateway, ['payu']);
+
+            $gatewayInstance = PaymentGatewayFactory::create($gateway);
+            if (!$gatewayInstance) {
+                Log::error("Payment gateway {$gateway} not found");
+                return $alwaysReturn200 ?
+                    response('OK', 200) :
+                    response()->json(['error' => 'Gateway not found'], 404);
             }
+
+            // Validate webhook signature
+            if (!$gatewayInstance->validateWebhookSignature($request)) {
+                Log::warning("Invalid webhook signature for {$gateway}");
+                // For PayU, return 200 OK even for invalid signature to prevent retries
+                return $alwaysReturn200 ?
+                    response('OK', 200) :
+                    response()->json(['error' => 'Invalid signature'], 401);
+            }
+
+            // Process the webhook
+            $result = $gatewayInstance->processWebhook($request);
+
+            // For PayU webhooks, handle order updates directly in the gateway
+            // since it already updates order status
+            if ($gateway === 'payu') {
+                // PayU gateway handles all order updates internally
+                // Just return 200 OK to acknowledge receipt
+                return response('OK', 200);
+            }
+
+            // For other gateways, process normally
+            if ($result['success']) {
+                // Find the order and update its status
+                if (isset($result['order_id'])) {
+                    $order = Order::find($result['order_id']);
+                    if ($order) {
+                        DB::beginTransaction();
+                        try {
+                            // Update order payment status based on webhook
+                            if (isset($result['payment_status'])) {
+                                if ($result['payment_status'] === 'completed') {
+                                    $order->update([
+                                        'payment_status' => 'paid',
+                                        'status' => 'processing'
+                                    ]);
+
+                                    // Clear cart if payment successful
+                                    if ($order->user_id) {
+                                        // Get session from order metadata if stored
+                                        $sessionId = $order->metadata['session_id'] ?? null;
+                                        $this->cartService->clearCart($order->user_id, $sessionId);
+                                    }
+
+                                    // Start order workflow
+                                    $this->orderService->processOrderCreated($order);
+
+                                } elseif ($result['payment_status'] === 'failed') {
+                                    $order->update([
+                                        'payment_status' => 'failed',
+                                        'status' => 'cancelled'
+                                    ]);
+                                }
+                            }
+
+                            DB::commit();
+                        } catch (\Exception $e) {
+                            DB::rollBack();
+                            Log::error("Error updating order from webhook", [
+                                'order_id' => $order->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                }
+
+                return response()->json(['success' => true], 200);
+            }
+
+            // Even on failure, return appropriate status
+            return $alwaysReturn200 ?
+                response('OK', 200) :
+                response()->json(['success' => false, 'message' => $result['message'] ?? 'Webhook processing failed'], 400);
+
         } catch (\Exception $e) {
-            Log::error('Webhook processing failed', [
-                'gateway' => $gateway,
-                'error' => $e->getMessage()
+            Log::error("Payment webhook error for {$gateway}", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-            return response()->json(['status' => 'error'], 500);
-        }
-    }
 
-    protected function handleRazorpayWebhook(Request $request)
-    {
-        $webhookSignature = $request->header('X-Razorpay-Signature');
-        $webhookBody = $request->getContent();
-        
-        // Verify webhook signature (implement according to Razorpay docs)
-        // For now, we'll just process the webhook
-        
-        $data = $request->all();
-        
-        if ($data['event'] === 'payment.captured') {
-            $paymentId = $data['payload']['payment']['entity']['order_id'];
-            $this->paymentService->updatePaymentStatus(
-                $paymentId,
-                'completed',
-                $data['payload']['payment']['entity']
-            );
-        }
-        
-        return response()->json(['status' => 'ok']);
-    }
+            // For PayU, always return 200 to prevent retries
+            if (isset($gateway) && $gateway === 'payu') {
+                return response('OK', 200);
+            }
 
-    protected function handleCashfreeWebhook(Request $request)
-    {
-        $data = $request->all();
-        
-        if ($data['type'] === 'PAYMENT_SUCCESS_WEBHOOK') {
-            $orderId = $data['data']['order']['order_id'];
-            $this->paymentService->updatePaymentStatus(
-                $orderId,
-                'completed',
-                $data['data']
-            );
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-        
-        return response()->json(['status' => 'ok']);
     }
 
     /**
      * Get payment status for an order
      */
-    public function getPaymentStatus(Request $request, $orderId)
+    public function getPaymentStatus($orderId)
     {
         try {
-            $order = Order::findOrFail($orderId);
-            
-            // Check if user can access this order
-            if ($order->user_id !== auth()->id()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized access to order'
-                ], 403);
-            }
+            $order = Order::where('id', $orderId)
+                ->orWhere('order_number', $orderId)
+                ->first();
 
-            $payment = Payment::where('order_id', $orderId)->latest()->first();
-
-            if (!$payment) {
+            if (!$order) {
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Payment not found for this order'
+                    'success' => false,
+                    'message' => 'Order not found'
                 ], 404);
             }
 
+            // Get latest payment for this order
+            $payment = Payment::where('order_id', $order->id)
+                ->latest()
+                ->first();
+
             return response()->json([
-                'status' => 'success',
-                'data' => [
-                    'payment_id' => $payment->id,
-                    'order_id' => $payment->order_id,
-                    'payment_method' => $payment->payment_method,
-                    'amount' => $payment->amount,
-                    'currency' => $payment->currency,
+                'success' => true,
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'payment_status' => $order->payment_status,
+                'payment_method' => $order->payment_method,
+                'payment_details' => $payment ? [
+                    'id' => $payment->id,
                     'status' => $payment->status,
-                    'created_at' => $payment->created_at,
-                    'updated_at' => $payment->updated_at
-                ]
-            ], 200);
+                    'gateway' => $payment->gateway,
+                    'amount' => $payment->amount,
+                    'created_at' => $payment->created_at
+                ] : null
+            ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to retrieve payment status'
-            ], 500);
-        }
-    }
-
-    /**
-     * Initiate payment refund
-     */
-    public function refundPayment(Request $request, $paymentId)
-    {
-        $validator = Validator::make($request->all(), [
-            'amount' => 'sometimes|numeric|min:0.01',
-            'reason' => 'sometimes|string|max:255'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $payment = Payment::findOrFail($paymentId);
-            
-            // Check if user can access this payment
-            if ($payment->order->user_id !== auth()->id()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized access to payment'
-                ], 403);
-            }
-
-            $refund = $this->paymentService->refundPayment(
-                $paymentId,
-                $request->amount,
-                $request->reason ?? 'customer_request'
-            );
+            Log::error('Failed to get payment status', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage()
+            ]);
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Refund initiated successfully',
-                'data' => [
-                    'refund_id' => $refund->id,
-                    'amount' => $refund->amount,
-                    'status' => $refund->status
-                ]
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Refund initiation failed: ' . $e->getMessage()
+                'success' => false,
+                'message' => 'Failed to get payment status'
             ], 500);
         }
     }

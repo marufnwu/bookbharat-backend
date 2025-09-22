@@ -4,7 +4,11 @@
       "Bash(curl:*)",
       "Bash(php:*)",
       "Bash(echo:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Read(//d/Laravel/bookbharat/src/app/Http/Controllers/Payment/**)",
+      "Bash(grep:*)",
+      "Read(//d/bookbharat-v2/bookbharat-admin/**)",
+      "Bash(npx tailwindcss init:*)"
     ],
     "deny": [],
     "ask": []

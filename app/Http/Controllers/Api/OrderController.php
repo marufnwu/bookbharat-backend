@@ -188,27 +188,30 @@ class OrderController extends Controller
                 $this->cartService->applyCoupon($request->coupon_code, $userId, $sessionId);
             }
 
-            // Process payment
+            // Process payment - this will initiate payment with the gateway
             $paymentResult = $this->paymentService->processPayment($order, $request->payment_method);
-            
+
             $order->update([
-                'payment_status' => $paymentResult['status'],
+                'payment_status' => 'pending', // Always pending until webhook confirms
                 'payment_transaction_id' => $paymentResult['transaction_id'] ?? null,
             ]);
 
-            // Clear cart
-            $this->cartService->clearCart($userId, $sessionId);
-
-            // Start order workflow
-            $this->orderService->processOrderCreated($order);
+            // Don't clear cart yet - wait for successful payment
+            // Cart will be cleared when payment is confirmed via webhook
 
             DB::commit();
 
+            // Check if this is COD or requires redirect
+            $requiresRedirect = !in_array($request->payment_method, ['cod']);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Order placed successfully',
+                'message' => $requiresRedirect ? 'Redirecting to payment gateway' : 'Order placed successfully',
                 'order' => $order->load(['orderItems.product']),
-                'payment_details' => $paymentResult
+                'payment_details' => $paymentResult,
+                'requires_redirect' => $requiresRedirect,
+                'redirect_url' => $paymentResult['payment_data']['payment_url'] ?? null,
+                'payment_session_id' => $paymentResult['payment_data']['payment_session_id'] ?? null
             ]);
 
         } catch (\Exception $e) {

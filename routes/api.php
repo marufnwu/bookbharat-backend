@@ -90,13 +90,17 @@ Route::prefix('v1')->group(function () {
 
     // Payment Routes (Public)
     Route::prefix('payment')->group(function () {
-        Route::get('/methods', [PaymentController::class, 'getAvailablePaymentMethods']);
-        Route::post('/initiate', [PaymentController::class, 'initiatePayment'])->middleware('auth:sanctum');
-        Route::post('/razorpay/callback', [PaymentController::class, 'razorpayCallback']);
-        Route::post('/cashfree/callback/{orderId}', [PaymentController::class, 'cashfreeCallback']);
-        Route::post('/webhook/{gateway}', [PaymentController::class, 'webhook']);
-        Route::get('/status/{orderId}', [PaymentController::class, 'getPaymentStatus'])->middleware('auth:sanctum');
-        Route::post('/refund/{paymentId}', [PaymentController::class, 'refundPayment'])->middleware('auth:sanctum');
+        Route::get('/gateways', [PaymentController::class, 'getAvailablePaymentMethods']);
+        Route::get('/methods', [PaymentController::class, 'getAvailablePaymentMethods']); // Alias for compatibility
+
+        // Callback routes (when user returns from payment gateway)
+        Route::any('/callback/{gateway}', [PaymentController::class, 'callback'])->name('payment.callback');
+
+        // Webhook routes (backend notifications from payment gateway)
+        Route::post('/webhook/{gateway}', [PaymentController::class, 'webhook'])->name('payment.webhook');
+
+        // Status check
+        Route::get('/status/{orderId}', [PaymentController::class, 'getPaymentStatus']);
     });
 
     // Configuration Routes (Public)
@@ -219,6 +223,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/stats', [WishlistController::class, 'stats']);
         });
     });
+
+    // Payment Gateway Routes
+    require __DIR__.'/payment.php';
 
     // Admin routes (require admin role)
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
