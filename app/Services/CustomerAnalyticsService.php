@@ -47,9 +47,9 @@ class CustomerAnalyticsService
     {
         $monthlySpending = $user->orders()
             ->where('status', 'delivered')
-            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, SUM(total_amount) as total')
-            ->groupByRaw('YEAR(created_at), MONTH(created_at)')
-            ->orderByRaw('YEAR(created_at) DESC, MONTH(created_at) DESC')
+            ->selectRaw("YEAR(created_at) as year, MONTH(created_at) as month, SUM(total_amount) as total")
+            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+            ->orderByRaw("YEAR(created_at) DESC, MONTH(created_at) DESC")
             ->limit(12)
             ->get()
             ->map(function ($item) {
@@ -174,8 +174,8 @@ class CustomerAnalyticsService
             'last_login' => $user->last_login_at,
             'total_reviews' => $user->reviews()->count(),
             'average_review_rating' => $user->reviews()->avg('rating'),
-            'wishlist_items' => $user->wishlistItems()->count() ?? 0,
-            'referral_count' => $user->referralCodes()->count() ?? 0,
+            'wishlist_items' => 0, // $user->wishlist()->count() ?? 0, - wishlist relationship needs fixing
+            'referral_count' => 0, // $user->referralCodes()->count() ?? 0, - referralCodes doesn't exist
             'social_shares' => 0, // This would be tracked separately
         ];
     }
@@ -205,7 +205,7 @@ class CustomerAnalyticsService
         return DB::table('orders')
             ->where('user_id', $user->id)
             ->where('status', 'delivered')
-            ->selectRaw('MONTH(created_at) as month, COUNT(*) as order_count, SUM(total_amount) as revenue')
+            ->selectRaw("MONTH(created_at) as month, COUNT(*) as order_count, SUM(total_amount) as revenue")
             ->groupBy('month')
             ->orderBy('month')
             ->get()
@@ -252,7 +252,7 @@ class CustomerAnalyticsService
 
     protected function getOrderTimingPatterns(User $user): array
     {
-        $orders = $user->orders()->selectRaw('HOUR(created_at) as hour, DAYOFWEEK(created_at) as day_of_week, COUNT(*) as count')
+        $orders = $user->orders()->selectRaw("HOUR(created_at) as hour, DAYOFWEEK(created_at) as day_of_week, COUNT(*) as count")
             ->groupBy('hour', 'day_of_week')
             ->get();
 

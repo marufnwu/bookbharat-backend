@@ -454,6 +454,7 @@ class SystemTestSeeder extends Seeder
                 'is_active' => true,
                 'email_verified_at' => now(),
                 'group' => $regularGroup,
+                'role' => 'customer',
             ],
             [
                 'name' => 'Jane Smith',
@@ -467,6 +468,7 @@ class SystemTestSeeder extends Seeder
                 'is_active' => true,
                 'email_verified_at' => now(),
                 'group' => $vipGroup,
+                'role' => 'customer',
             ],
             [
                 'name' => 'Store Admin',
@@ -478,17 +480,25 @@ class SystemTestSeeder extends Seeder
                 'is_active' => true,
                 'email_verified_at' => now(),
                 'group' => null, // Admin doesn't need customer group
+                'role' => 'admin', // Assign admin role
             ],
         ];
 
         foreach ($users as $userData) {
-            $group = $userData['group'];
+            $group = $userData['group'] ?? null;
+            $role = $userData['role'] ?? null;
             unset($userData['group']);
+            unset($userData['role']);
 
             $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
+
+            // Assign role if specified
+            if ($role && !$user->hasRole($role)) {
+                $user->assignRole($role);
+            }
 
             if ($group && !$user->customerGroups()->where('customer_group_id', $group->id)->exists()) {
                 $user->customerGroups()->attach($group->id);

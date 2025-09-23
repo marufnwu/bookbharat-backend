@@ -19,6 +19,14 @@ class ShippingWeightSlab extends Model
         'base_weight' => 'decimal:2',
     ];
 
+    /**
+     * Get the shipping zones for this weight slab.
+     */
+    public function shippingZones()
+    {
+        return $this->hasMany(ShippingZone::class, 'shipping_weight_slab_id');
+    }
+
     public function scopeForCourier(Builder $query, string $courier = null)
     {
         if ($courier) {

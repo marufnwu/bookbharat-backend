@@ -343,7 +343,42 @@ class OrderAutomationService
         $automatedTransitions = OrderWorkflow::whereIn('order_id', $orders->pluck('id'))
             ->where('is_automated', true)
             ->count();
-            
+
         return $totalTransitions > 0 ? round(($automatedTransitions / $totalTransitions) * 100, 2) : 0;
+    }
+
+    /**
+     * Get available status transitions for a given order status
+     */
+    public function getAvailableTransitions(string $currentStatus): array
+    {
+        return $this->validTransitions[$currentStatus] ?? [];
+    }
+
+    /**
+     * Update order status with validation and workflow recording
+     */
+    public function updateOrderStatus(Order $order, string $newStatus, ?string $notes = null): void
+    {
+        $this->processOrderStateTransition($order, $newStatus, auth()->id(), $notes);
+    }
+
+    /**
+     * Process payment confirmation for an order
+     */
+    public function processPaymentConfirmation(Order $order): void
+    {
+        // Update order timestamps
+        $order->update([
+            'confirmed_at' => now(),
+        ]);
+
+        // If order is pending, move to confirmed
+        if ($order->status === 'pending') {
+            $this->updateOrderStatus($order, 'confirmed', 'Payment confirmed');
+        }
+
+        // Send confirmation notification
+        dispatch(new SendOrderNotification($order, 'payment_confirmed'));
     }
 }

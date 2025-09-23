@@ -22,9 +22,11 @@ class DatabaseSeeder extends Seeder
             PaymentConfigurationSeeder::class,
 
             // Geographic and Shipping Configuration
-             PinCodeSeeder::class,
-             ShippingZoneSeeder::class,
-             ShippingWeightSlabSeeder::class,
+            // Note: Order is important - weight slabs must be created before zones
+            ShippingWeightSlabSeeder::class,  // Create weight slabs first
+            ShippingZoneSeeder::class,         // Then create zone rates for each weight slab
+            PincodeZoneSeeder::class,          // Map pincodes to zones
+            BundleDiscountRuleSeeder::class,   // Add shipping discount rules
 
             // Marketing and Discounts
             CouponsTableSeeder::class,

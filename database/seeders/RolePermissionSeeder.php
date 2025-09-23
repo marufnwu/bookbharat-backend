@@ -183,10 +183,20 @@ class RolePermissionSeeder extends Seeder
             $customerUser->assignRole('customer');
         }
 
+        // Also assign admin role to store-admin@bookbharat.com if it exists
+        $storeAdmin = User::where('email', 'store-admin@bookbharat.com')->first();
+        if ($storeAdmin && !$storeAdmin->hasRole('admin')) {
+            $storeAdmin->assignRole('admin');
+            $this->command->info('Store Admin: store-admin@bookbharat.com assigned admin role');
+        }
+
         $this->command->info('Roles and permissions created successfully!');
         $this->command->info('Default users created:');
         $this->command->info('Super Admin: admin@bookbharat.com / admin123456');
         $this->command->info('Manager: manager@bookbharat.com / manager123456');
         $this->command->info('Customer: customer@example.com / customer123');
+        if ($storeAdmin) {
+            $this->command->info('Store Admin: store-admin@bookbharat.com / admin123');
+        }
     }
 }

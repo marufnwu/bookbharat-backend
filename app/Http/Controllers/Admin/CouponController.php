@@ -10,13 +10,15 @@ use App\Models\Category;
 use App\Models\CustomerGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CouponController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permission:manage-coupons');
+        // Middleware is already handled in routes
+        // $this->middleware('permission:manage-coupons');
     }
 
     public function index(Request $request)

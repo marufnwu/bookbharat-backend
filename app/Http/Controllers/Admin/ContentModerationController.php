@@ -16,7 +16,8 @@ class ContentModerationController extends Controller
     public function __construct(SocialCommerceService $socialCommerceService)
     {
         $this->socialCommerceService = $socialCommerceService;
-        $this->middleware('permission:moderate-content');
+        // Middleware is already handled in routes
+        // $this->middleware('permission:moderate-content');
     }
 
     public function index(Request $request)

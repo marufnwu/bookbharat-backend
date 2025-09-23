@@ -8,7 +8,10 @@
       "Read(//d/Laravel/bookbharat/src/app/Http/Controllers/Payment/**)",
       "Bash(grep:*)",
       "Read(//d/bookbharat-v2/bookbharat-admin/**)",
-      "Bash(npx tailwindcss init:*)"
+      "Bash(npx tailwindcss init:*)",
+      "Bash(npm install:*)",
+      "Bash(find:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": []

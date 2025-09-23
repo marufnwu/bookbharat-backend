@@ -16,8 +16,8 @@ return new class extends Migration
             $table->decimal('total_amount', 10, 2)->default(0);
             $table->integer('items_count')->default(0);
             $table->string('currency', 3)->default('INR');
-            $table->timestamp('last_activity');
-            $table->timestamp('expires_at');
+            $table->timestamp('last_activity')->useCurrent();
+            $table->timestamp('expires_at')->useCurrent();
             $table->string('recovery_token')->nullable();
             $table->boolean('is_abandoned')->default(false);
             $table->timestamp('abandoned_at')->nullable();

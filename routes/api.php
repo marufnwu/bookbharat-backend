@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\StaticPageController;
 use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\ShippingConfigController;
@@ -279,6 +280,30 @@ Route::prefix('v1')->group(function () {
             Route::put('/{user}', [AdminUserController::class, 'update']);
             Route::post('/{user}/reset-password', [AdminUserController::class, 'resetPassword']);
             Route::post('/{user}/toggle-status', [AdminUserController::class, 'toggleStatus']);
+            Route::get('/{user}/analytics', [AdminUserController::class, 'getAnalytics']);
+            Route::get('/{user}/orders', [AdminUserController::class, 'getOrders']);
+            Route::get('/{user}/addresses', [AdminUserController::class, 'getAddresses']);
+        });
+
+        // Customers (alias for users)
+        Route::prefix('customers')->group(function () {
+            Route::get('/', [AdminUserController::class, 'index']);
+            Route::get('/{user}', [AdminUserController::class, 'show']);
+            Route::put('/{user}', [AdminUserController::class, 'update']);
+            Route::delete('/{user}', [AdminUserController::class, 'destroy']);
+        });
+
+        // Settings Management
+        Route::prefix('settings')->group(function () {
+            Route::get('/general', [SettingsController::class, 'getGeneral']);
+            Route::put('/general', [SettingsController::class, 'updateGeneral']);
+            Route::get('/roles', [SettingsController::class, 'getRoles']);
+            Route::post('/roles', [SettingsController::class, 'createRole']);
+            Route::put('/roles/{role}', [SettingsController::class, 'updateRole']);
+            Route::delete('/roles/{role}', [SettingsController::class, 'deleteRole']);
+            Route::get('/email-templates', [SettingsController::class, 'getEmailTemplates']);
+            Route::get('/payment', [SettingsController::class, 'getPayment']);
+            Route::get('/shipping', [SettingsController::class, 'getShipping']);
         });
 
         // Advanced Order Management

@@ -17,7 +17,8 @@ class OrderController extends Controller
     public function __construct(OrderAutomationService $orderService)
     {
         $this->orderService = $orderService;
-        $this->middleware('permission:manage-orders');
+        // Middleware is already handled in routes
+        // $this->middleware('permission:manage-orders');
     }
 
     public function index(Request $request)
@@ -66,10 +67,10 @@ class OrderController extends Controller
     {
         $order->load([
             'user',
-            'orderItems.product',
-            'referralCode',
-            'returns',
-            'shipments'
+            'orderItems.product'
+            // 'referralCode',
+            // 'returns',
+            // 'shipments'
         ]);
 
         return response()->json([

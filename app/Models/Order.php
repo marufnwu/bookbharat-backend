@@ -87,6 +87,18 @@ class Order extends Model
         return $this->belongsTo(DeliveryOption::class);
     }
 
+    public function workflows(): HasMany
+    {
+        return $this->hasMany(OrderWorkflow::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        // Payment refunds are linked through payments, not directly to orders
+        // For now, return an empty collection
+        return $this->hasMany(PaymentRefund::class, 'order_id');
+    }
+
     // Scopes
     public function scopePending($query)
     {

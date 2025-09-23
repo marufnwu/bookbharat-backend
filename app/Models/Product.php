@@ -117,6 +117,16 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+    public function productAttributes(): HasMany
+    {
+        return $this->hasMany(ProductAttribute::class);
+    }
+
+    public function wishlists(): HasMany
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
     // Scopes
     public function scopeActive($query)
     {

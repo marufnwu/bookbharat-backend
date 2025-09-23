@@ -81,7 +81,10 @@ class CouponsTableSeeder extends Seeder
         ];
 
         foreach ($coupons as $coupon) {
-            Coupon::create($coupon);
+            Coupon::updateOrCreate(
+                ['code' => $coupon['code']], // Check by code
+                $coupon // Update or create with all data
+            );
         }
     }
 }

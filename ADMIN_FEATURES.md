@@ -497,6 +497,7 @@ This document provides a comprehensive specification of all admin features requi
 - `GET /api/v1/admin/content/media/library`
 - `DELETE /api/v1/admin/content/media/{id}`
 
+
 - Upload images/documents
 - Organize media
 - Image optimization

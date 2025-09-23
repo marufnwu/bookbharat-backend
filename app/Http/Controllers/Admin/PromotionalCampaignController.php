@@ -17,7 +17,8 @@ class PromotionalCampaignController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permission:manage-campaigns');
+        // Middleware is already handled in routes
+        // $this->middleware('permission:manage-campaigns');
     }
 
     public function index(Request $request)

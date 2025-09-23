@@ -19,7 +19,9 @@ class RoleMiddleware
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        if (!$request->user()->hasRole($role)) {
+        // Check if user has the specified role or super-admin role
+        // super-admin has access to everything
+        if (!$request->user()->hasRole($role) && !$request->user()->hasRole('super-admin')) {
             return response()->json(['error' => 'Access denied. Required role: ' . $role], 403);
         }
 

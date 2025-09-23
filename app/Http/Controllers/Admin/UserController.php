@@ -8,6 +8,7 @@ use App\Models\CustomerGroup;
 use App\Services\CustomerAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -67,10 +68,10 @@ class UserController extends Controller
             'orders.orderItems.product:id,name',
             'reviews.product:id,name',
             'customerGroups',
-            'analytics',
-            'loyaltyAccount',
-            'referralCodes',
-            'socialAccounts'
+            // 'analytics', // Disabled - needs proper migration
+            // 'loyaltyAccount', // Disabled - model doesn't exist
+            // 'referralCodes', // Disabled - model doesn't exist
+            // 'socialAccounts' // Disabled - model doesn't exist
         ]);
 
         $analytics = $this->analyticsService->getUserAnalytics($user);
@@ -139,11 +140,10 @@ class UserController extends Controller
             'active_users' => User::where('is_active', true)->count(),
             'new_users_this_month' => User::where('created_at', '>=', now()->startOfMonth())->count(),
             'users_with_orders' => User::whereHas('orders')->count(),
-            'average_order_value' => User::whereHas('orders')
-                ->withSum(['orders as total_spent' => function ($q) {
-                    $q->where('status', 'delivered');
-                }], 'total_amount')
-                ->avg('total_spent'),
+            'average_order_value' => DB::table('orders')
+                ->where('status', 'delivered')
+                ->whereNotNull('user_id')
+                ->avg('total_amount') ?? 0,
         ];
     }
 
@@ -156,5 +156,38 @@ class UserController extends Controller
                 ['value' => 'inactive', 'label' => 'Inactive'],
             ]
         ];
+    }
+
+    public function getAnalytics(User $user)
+    {
+        $analytics = $this->analyticsService->getUserAnalytics($user);
+
+        return response()->json([
+            'success' => true,
+            'analytics' => $analytics
+        ]);
+    }
+
+    public function getOrders(User $user)
+    {
+        $orders = $user->orders()
+            ->with(['orderItems.product:id,name'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json([
+            'success' => true,
+            'orders' => $orders
+        ]);
+    }
+
+    public function getAddresses(User $user)
+    {
+        $addresses = $user->addresses;
+
+        return response()->json([
+            'success' => true,
+            'addresses' => $addresses
+        ]);
     }
 }

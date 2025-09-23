@@ -57,6 +57,84 @@ class ShippingConfigController extends Controller
     }
 
     /**
+     * Get all zones
+     */
+    public function getZones(Request $request)
+    {
+        $zones = ShippingZone::all();
+
+        return response()->json([
+            'success' => true,
+            'zones' => $zones
+        ]);
+    }
+
+    /**
+     * Store a new zone
+     */
+    public function storeZone(Request $request)
+    {
+        $validated = $request->validate([
+            'shipping_weight_slab_id' => 'required|exists:shipping_weight_slabs,id',
+            'zone' => 'required|string|in:A,B,C,D,E',
+            'fwd_rate' => 'required|numeric|min:0',
+            'rto_rate' => 'required|numeric|min:0',
+            'aw_rate' => 'required|numeric|min:0',
+            'cod_charges' => 'required|numeric|min:0',
+            'cod_percentage' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $zone = ShippingZone::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Zone created successfully',
+            'zone' => $zone
+        ], 201);
+    }
+
+    /**
+     * Update a zone
+     */
+    public function updateZone(Request $request, $id)
+    {
+        $zone = ShippingZone::findOrFail($id);
+
+        $validated = $request->validate([
+            'shipping_weight_slab_id' => 'sometimes|required|exists:shipping_weight_slabs,id',
+            'zone' => 'sometimes|required|string|in:A,B,C,D,E',
+            'fwd_rate' => 'sometimes|required|numeric|min:0',
+            'rto_rate' => 'sometimes|required|numeric|min:0',
+            'aw_rate' => 'sometimes|required|numeric|min:0',
+            'cod_charges' => 'sometimes|required|numeric|min:0',
+            'cod_percentage' => 'sometimes|required|numeric|min:0|max:100',
+        ]);
+
+        $zone->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Zone updated successfully',
+            'zone' => $zone->fresh()
+        ]);
+    }
+
+    /**
+     * Delete a zone
+     */
+    public function deleteZone($id)
+    {
+        $zone = ShippingZone::findOrFail($id);
+
+        $zone->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Zone deleted successfully'
+        ]);
+    }
+
+    /**
      * Get all weight slabs with pagination
      */
     public function getWeightSlabs(Request $request)
@@ -76,6 +154,14 @@ class ShippingConfigController extends Controller
             'success' => true,
             'weight_slabs' => $weightSlabs
         ]);
+    }
+
+    /**
+     * Store new weight slab (alias for createWeightSlab)
+     */
+    public function storeWeightSlab(Request $request)
+    {
+        return $this->createWeightSlab($request);
     }
 
     /**
@@ -112,8 +198,10 @@ class ShippingConfigController extends Controller
     /**
      * Update weight slab
      */
-    public function updateWeightSlab(Request $request, ShippingWeightSlab $weightSlab)
+    public function updateWeightSlab(Request $request, $id)
     {
+        $weightSlab = ShippingWeightSlab::findOrFail($id);
+
         $validated = $request->validate([
             'courier_name' => 'required|string|max:255',
             'base_weight' => 'required|numeric|min:0|max:100',
@@ -137,16 +225,17 @@ class ShippingConfigController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Weight slab updated successfully',
-            'weight_slab' => $weightSlab
+            'weight_slab' => $weightSlab->fresh()
         ]);
     }
 
     /**
      * Delete weight slab
      */
-    public function deleteWeightSlab(ShippingWeightSlab $weightSlab)
+    public function deleteWeightSlab($id)
     {
         try {
+            $weightSlab = ShippingWeightSlab::findOrFail($id);
             $weightSlab->delete();
 
             return response()->json([
@@ -194,6 +283,28 @@ class ShippingConfigController extends Controller
         return response()->json([
             'success' => true,
             'pincode_zones' => $pincodes
+        ]);
+    }
+
+    /**
+     * Store new pincode zone (alias for createPincodeZone)
+     */
+    public function storePincodeZone(Request $request)
+    {
+        return $this->createPincodeZone($request);
+    }
+
+    /**
+     * Delete a pincode zone
+     */
+    public function deletePincodeZone($id)
+    {
+        $pincodeZone = PincodeZone::findOrFail($id);
+        $pincodeZone->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pincode zone deleted successfully'
         ]);
     }
 

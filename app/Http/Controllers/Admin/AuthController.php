@@ -26,8 +26,8 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check if user is admin
-        if (!$user->hasRole('admin')) {
+        // Check if user is admin or super-admin
+        if (!$user->hasAnyRole(['admin', 'super-admin', 'manager'])) {
             throw ValidationException::withMessages([
                 'email' => ['You do not have admin access.'],
             ]);
@@ -43,10 +43,10 @@ class AuthController extends Controller
         // Create token
         $token = $user->createToken('admin-token', ['admin'])->plainTextToken;
 
-        // Get user permissions
-        $permissions = $user->getAllPermissions()->pluck('name');
-        $roles = $user->roles->pluck('name');
+        // Load user with roles and permissions
+        $user->load('roles.permissions');
 
+        // Format the response
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
@@ -56,11 +56,22 @@ class AuthController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'avatar' => $user->avatar,
-                    'roles' => $roles,
-                    'permissions' => $permissions
+                    'roles' => $user->roles->map(function ($role) {
+                        return [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'permissions' => $role->permissions->map(function ($permission) {
+                                return [
+                                    'id' => $permission->id,
+                                    'name' => $permission->name,
+                                    'guard_name' => $permission->guard_name
+                                ];
+                            })
+                        ];
+                    })
                 ],
                 'token' => $token,
-                'token_type' => 'Bearer'
+                'expires_at' => now()->addDays(7)->toISOString()
             ]
         ]);
     }
@@ -79,15 +90,15 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || !$user->hasRole('admin')) {
+        if (!$user || !$user->hasAnyRole(['admin', 'super-admin', 'manager'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Not authenticated as admin'
             ], 401);
         }
 
-        $permissions = $user->getAllPermissions()->pluck('name');
-        $roles = $user->roles->pluck('name');
+        // Load user with roles and permissions
+        $user->load('roles.permissions');
 
         return response()->json([
             'success' => true,
@@ -97,8 +108,19 @@ class AuthController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'avatar' => $user->avatar,
-                    'roles' => $roles,
-                    'permissions' => $permissions
+                    'roles' => $user->roles->map(function ($role) {
+                        return [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'permissions' => $role->permissions->map(function ($permission) {
+                                return [
+                                    'id' => $permission->id,
+                                    'name' => $permission->name,
+                                    'guard_name' => $permission->guard_name
+                                ];
+                            })
+                        ];
+                    })
                 ]
             ]
         ]);
@@ -108,7 +130,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || !$user->hasRole('admin')) {
+        if (!$user || !$user->hasAnyRole(['admin', 'super-admin', 'manager'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Not authenticated as admin'
@@ -121,8 +143,8 @@ class AuthController extends Controller
         // Create new token
         $token = $user->createToken('admin-token', ['admin'])->plainTextToken;
 
-        $permissions = $user->getAllPermissions()->pluck('name');
-        $roles = $user->roles->pluck('name');
+        // Load user with roles and permissions
+        $user->load('roles.permissions');
 
         return response()->json([
             'success' => true,
@@ -133,11 +155,22 @@ class AuthController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'avatar' => $user->avatar,
-                    'roles' => $roles,
-                    'permissions' => $permissions
+                    'roles' => $user->roles->map(function ($role) {
+                        return [
+                            'id' => $role->id,
+                            'name' => $role->name,
+                            'permissions' => $role->permissions->map(function ($permission) {
+                                return [
+                                    'id' => $permission->id,
+                                    'name' => $permission->name,
+                                    'guard_name' => $permission->guard_name
+                                ];
+                            })
+                        ];
+                    })
                 ],
                 'token' => $token,
-                'token_type' => 'Bearer'
+                'expires_at' => now()->addDays(7)->toISOString()
             ]
         ]);
     }
