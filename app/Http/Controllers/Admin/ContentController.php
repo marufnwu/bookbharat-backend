@@ -40,7 +40,7 @@ class ContentController extends Controller
 
         // Update configuration
         $configData = $request->all();
-        
+
         // Store in database or config file
         // For now, we'll use cache and assume config is stored elsewhere
         Cache::forget('site_config');
@@ -76,7 +76,7 @@ class ContentController extends Controller
         }
 
         $configData = $request->all();
-        
+
         Cache::forget('homepage_config');
         Cache::put('homepage_config', $configData, 1800);
 
@@ -106,7 +106,7 @@ class ContentController extends Controller
         }
 
         $configData = $request->all();
-        
+
         Cache::forget('navigation_config');
         Cache::put('navigation_config', $configData, 3600);
 
@@ -138,7 +138,7 @@ class ContentController extends Controller
         }
 
         $pageData = $request->all();
-        
+
         // In a real implementation, this would be stored in database
         Cache::forget("content_page_{$slug}");
         Cache::put("content_page_{$slug}", $pageData, 3600);
@@ -170,7 +170,7 @@ class ContentController extends Controller
 
         $file = $request->file('file');
         $type = $request->input('type');
-        
+
         // Store file
         $path = $file->store("media/{$type}", 'public');
         $url = asset("storage/{$path}");

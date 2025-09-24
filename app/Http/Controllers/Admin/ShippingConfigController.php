@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ShippingWeightSlab;
 use App\Models\ShippingZone;
 use App\Models\PincodeZone;
+use App\Models\InventoryLocation;
 use App\Services\ShippingService;
 use App\Services\ZoneCalculationService;
 use Illuminate\Http\Request;
@@ -414,7 +415,6 @@ class ShippingConfigController extends Controller
     public function testCalculation(Request $request)
     {
         $validated = $request->validate([
-            'pickup_pincode' => 'required|string|size:6',
             'delivery_pincode' => 'required|string|size:6',
             'weight' => 'required|numeric|min:0.1',
             'order_value' => 'required|numeric|min:1',
@@ -436,8 +436,11 @@ class ShippingConfigController extends Controller
         ];
 
         try {
+            // Use configured pickup pincode instead of user input
+            $pickupPincode = $this->getDefaultPickupPincode();
+
             $shippingData = $this->shippingService->calculateShippingCharges(
-                $validated['pickup_pincode'],
+                $pickupPincode,
                 $validated['delivery_pincode'],
                 $items,
                 $validated['order_value']
@@ -532,5 +535,161 @@ class ShippingConfigController extends Controller
             ->groupBy('zone')
             ->orderBy('usage_count', 'desc')
             ->get();
+    }
+
+    /**
+     * Get default pickup pincode from configured warehouse
+     */
+    protected function getDefaultPickupPincode(): string
+    {
+        $defaultWarehouse = InventoryLocation::where('is_default', true)
+            ->where('is_active', true)
+            ->first();
+
+        return $defaultWarehouse ? $defaultWarehouse->postal_code : '110001'; // Fallback to Delhi
+    }
+
+    /**
+     * Get all warehouses
+     */
+    public function getWarehouses(Request $request)
+    {
+        $perPage = $request->input('per_page', 15);
+        $search = $request->input('search');
+
+        $query = InventoryLocation::query();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                  ->orWhere('code', 'LIKE', "%{$search}%")
+                  ->orWhere('city', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $warehouses = $query->orderBy('is_default', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'warehouses' => $warehouses
+        ]);
+    }
+
+    /**
+     * Store new warehouse
+     */
+    public function storeWarehouse(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'required|string|max:20|unique:inventory_locations,code',
+            'type' => 'required|string|in:warehouse,store,supplier',
+            'address' => 'required|string',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'postal_code' => 'required|string|size:6',
+            'country' => 'required|string|max:100',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:20',
+            'contact_email' => 'nullable|email|max:255',
+            'is_active' => 'boolean',
+            'is_default' => 'boolean',
+        ]);
+
+        // If this is being set as default, unset other defaults
+        if ($validated['is_default'] ?? false) {
+            InventoryLocation::where('is_default', true)->update(['is_default' => false]);
+        }
+
+        $warehouse = InventoryLocation::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Warehouse created successfully',
+            'warehouse' => $warehouse
+        ], 201);
+    }
+
+    /**
+     * Update warehouse
+     */
+    public function updateWarehouse(Request $request, $id)
+    {
+        $warehouse = InventoryLocation::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'required|string|max:20|unique:inventory_locations,code,' . $id,
+            'type' => 'required|string|in:warehouse,store,supplier',
+            'address' => 'required|string',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'postal_code' => 'required|string|size:6',
+            'country' => 'required|string|max:100',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:20',
+            'contact_email' => 'nullable|email|max:255',
+            'is_active' => 'boolean',
+            'is_default' => 'boolean',
+        ]);
+
+        // If this is being set as default, unset other defaults
+        if ($validated['is_default'] ?? false) {
+            InventoryLocation::where('is_default', true)
+                ->where('id', '!=', $id)
+                ->update(['is_default' => false]);
+        }
+
+        $warehouse->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Warehouse updated successfully',
+            'warehouse' => $warehouse->fresh()
+        ]);
+    }
+
+    /**
+     * Delete warehouse
+     */
+    public function deleteWarehouse($id)
+    {
+        $warehouse = InventoryLocation::findOrFail($id);
+
+        if ($warehouse->is_default) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete default warehouse. Please set another warehouse as default first.'
+            ], 422);
+        }
+
+        $warehouse->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Warehouse deleted successfully'
+        ]);
+    }
+
+    /**
+     * Set warehouse as default
+     */
+    public function setDefaultWarehouse($id)
+    {
+        $warehouse = InventoryLocation::findOrFail($id);
+
+        // Unset all other defaults
+        InventoryLocation::where('is_default', true)->update(['is_default' => false]);
+
+        // Set this one as default
+        $warehouse->update(['is_default' => true, 'is_active' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Default warehouse updated successfully',
+            'warehouse' => $warehouse->fresh()
+        ]);
     }
 }

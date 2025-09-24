@@ -211,10 +211,32 @@ class InventoryService
         }
     }
     
+    public function adjustInventory($productId, array $adjustmentData)
+    {
+        $product = Product::find($productId);
+
+        if (!$product) {
+            throw new \Exception("Product not found with ID: {$productId}");
+        }
+
+        $adjustment = $adjustmentData['adjustment'] ?? 0;
+        $adjustmentType = $adjustmentData['adjustment_type'] ?? 'adjustment';
+        $notes = $adjustmentData['notes'] ?? 'Inventory adjustment';
+
+        if ($adjustment == 0) {
+            return true; // No adjustment needed
+        }
+
+        $type = $adjustment > 0 ? 'increase' : 'decrease';
+        $quantity = abs($adjustment);
+
+        return $this->updateStock($product, $quantity, $type, $notes);
+    }
+
     public function bulkUpdateStock(array $updates)
     {
         DB::beginTransaction();
-        
+
         try {
             foreach ($updates as $update) {
                 $product = Product::find($update['product_id']);
@@ -227,7 +249,7 @@ class InventoryService
                     );
                 }
             }
-            
+
             DB::commit();
             return true;
         } catch (\Exception $e) {

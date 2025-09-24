@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Scout\Searchable;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -25,22 +26,35 @@ class Product extends Model
         'sku',
         'stock_quantity',
         'sales_count',
+        'low_stock_threshold',
         'min_stock_level',
         'manage_stock',
+        'track_stock',
+        'allow_backorder',
         'in_stock',
+        'is_active',
         'weight',
         'dimensions',
         'category_id',
         'brand',
         'author',
+        'publisher',
+        'isbn',
+        'language',
+        'pages',
+        'publication_date',
         'status',
         'rating',
         'is_featured',
         'is_bestseller',
         'is_digital',
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
         'attributes',
         'metadata',
-        'seo'
+        'seo',
+        'tags'
     ];
 
     protected $casts = [
@@ -51,15 +65,22 @@ class Product extends Model
         'stock_quantity' => 'integer',
         'sales_count' => 'integer',
         'min_stock_level' => 'integer',
+        'low_stock_threshold' => 'integer',
+        'pages' => 'integer',
         'rating' => 'decimal:2',
         'manage_stock' => 'boolean',
+        'track_stock' => 'boolean',
+        'allow_backorder' => 'boolean',
         'in_stock' => 'boolean',
+        'is_active' => 'boolean',
         'is_featured' => 'boolean',
         'is_bestseller' => 'boolean',
         'is_digital' => 'boolean',
         'attributes' => 'array',
         'metadata' => 'array',
         'seo' => 'array',
+        'tags' => 'array',
+        'publication_date' => 'date',
     ];
 
     public function getActivitylogOptions(): LogOptions
@@ -77,6 +98,9 @@ class Product extends Model
             'short_description' => $this->short_description,
             'sku' => $this->sku,
             'brand' => $this->brand,
+            'author' => $this->author,
+            'publisher' => $this->publisher,
+            'isbn' => $this->isbn,
             'category' => $this->category->name ?? null,
         ];
     }
@@ -127,10 +151,15 @@ class Product extends Model
         return $this->hasMany(Wishlist::class);
     }
 
+    public function returns(): HasMany
+    {
+        return $this->hasMany(ProductReturn::class);
+    }
+
     // Scopes
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->where('is_active', true);
     }
 
     public function scopeFeatured($query)
@@ -140,7 +169,7 @@ class Product extends Model
 
     public function scopeInStock($query)
     {
-        return $query->where('in_stock', true);
+        return $query->where('stock_quantity', '>', 0);
     }
 
     public function scopeByCategory($query, $categoryId)
@@ -151,7 +180,30 @@ class Product extends Model
     // Accessors
     public function getPrimaryImageAttribute()
     {
-        return $this->images()->where('is_primary', true)->first();
+        $image = $this->images()->where('is_primary', true)->first();
+        if ($image) {
+            return [
+                'id' => $image->id,
+                'image_path' => $image->image_path,
+                'image_url' => Storage::disk('public')->url($image->image_path),
+                'alt_text' => $image->alt_text,
+            ];
+        }
+        return null;
+    }
+
+    public function getImagesAttribute()
+    {
+        return $this->images()->get()->map(function ($image) {
+            return [
+                'id' => $image->id,
+                'image_path' => $image->image_path,
+                'image_url' => Storage::disk('public')->url($image->image_path),
+                'alt_text' => $image->alt_text,
+                'sort_order' => $image->sort_order,
+                'is_primary' => $image->is_primary,
+            ];
+        });
     }
 
     public function getDiscountPercentageAttribute()
@@ -201,10 +253,41 @@ class Product extends Model
         return $this->stock_quantity;
     }
 
+    public function getAvailableStockAttribute()
+    {
+        return $this->stock_quantity; // In the future, subtract reserved stock
+    }
+
+    public function getStockStatusAttribute()
+    {
+        if ($this->stock_quantity <= 0) {
+            return 'out_of_stock';
+        } elseif ($this->stock_quantity <= ($this->low_stock_threshold ?? 10)) {
+            return 'low_stock';
+        }
+        return 'in_stock';
+    }
+
     // Mutators
     public function setNameAttribute($value)
     {
         $this->attributes['name'] = $value;
-        $this->attributes['slug'] = \Str::slug($value);
+        if (empty($this->attributes['slug'])) {
+            $this->attributes['slug'] = \Str::slug($value);
+        }
+    }
+
+    // For backwards compatibility with existing code that might reference these fields
+    public function getTitleAttribute()
+    {
+        return $this->name;
+    }
+
+    public function getAuthorsAttribute()
+    {
+        if ($this->author) {
+            return [['name' => $this->author]];
+        }
+        return [];
     }
 }

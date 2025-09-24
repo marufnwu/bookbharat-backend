@@ -231,14 +231,6 @@ Route::prefix('v1')->group(function () {
     // Admin routes (require admin role)
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
         
-        // Product Management
-        Route::prefix('products')->group(function () {
-            Route::post('/', [ProductController::class, 'store']);
-            Route::put('/{id}', [ProductController::class, 'update']);
-            Route::delete('/{id}', [ProductController::class, 'destroy']);
-            Route::post('/{id}/images', [ProductController::class, 'uploadImages']);
-            Route::put('/{id}/toggle-status', [ProductController::class, 'toggleStatus']);
-        });
 
         // Category Management
         Route::prefix('categories')->group(function () {

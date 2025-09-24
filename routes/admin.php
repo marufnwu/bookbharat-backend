@@ -190,6 +190,15 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
             Route::post('/check-zone', [ShippingConfigController::class, 'checkPincodeZone']);
         });
 
+        // Warehouses
+        Route::prefix('warehouses')->group(function () {
+            Route::get('/', [ShippingConfigController::class, 'getWarehouses']);
+            Route::post('/', [ShippingConfigController::class, 'storeWarehouse']);
+            Route::put('/{id}', [ShippingConfigController::class, 'updateWarehouse']);
+            Route::delete('/{id}', [ShippingConfigController::class, 'deleteWarehouse']);
+            Route::post('/{id}/set-default', [ShippingConfigController::class, 'setDefaultWarehouse']);
+        });
+
         // Testing & Analytics
         Route::post('/test-calculation', [ShippingConfigController::class, 'testCalculation']);
         Route::get('/analytics', [ShippingConfigController::class, 'getAnalytics']);

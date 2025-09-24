@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\ShippingService;
 use App\Models\Cart;
+use App\Models\InventoryLocation;
 use Illuminate\Http\Request;
 
 class ShippingController extends Controller
@@ -23,7 +24,6 @@ class ShippingController extends Controller
     {
         $request->validate([
             'delivery_pincode' => 'required|string|size:6',
-            'pickup_pincode' => 'string|size:6',
             'include_insurance' => 'boolean',
             'delivery_option_id' => 'nullable|exists:delivery_options,id',
             'is_remote' => 'boolean',
@@ -51,7 +51,7 @@ class ShippingController extends Controller
                 ], 400);
             }
 
-            $pickupPincode = $request->pickup_pincode ?? '110001'; // Default Delhi
+            $pickupPincode = $this->getDefaultPickupPincode();
             $deliveryPincode = $request->delivery_pincode;
             
             $options = [
@@ -95,7 +95,6 @@ class ShippingController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'delivery_pincode' => 'required|string|size:6',
-            'pickup_pincode' => 'string|size:6',
             'order_value' => 'numeric|min:0',
             'include_insurance' => 'boolean',
             'delivery_option_id' => 'nullable|exists:delivery_options,id',
@@ -112,7 +111,7 @@ class ShippingController extends Controller
                 ];
             })->toArray();
 
-            $pickupPincode = $request->pickup_pincode ?? '110001';
+            $pickupPincode = $this->getDefaultPickupPincode();
             $deliveryPincode = $request->delivery_pincode;
             $orderValue = $request->order_value ?? 0;
             
@@ -175,8 +174,7 @@ class ShippingController extends Controller
     public function checkPincode(Request $request)
     {
         $request->validate([
-            'pincode' => 'required|string|size:6',
-            'pickup_pincode' => 'string|size:6'
+            'pincode' => 'required|string|size:6'
         ]);
 
         try {
@@ -352,5 +350,17 @@ class ShippingController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get default pickup pincode from configured warehouse
+     */
+    protected function getDefaultPickupPincode(): string
+    {
+        $defaultWarehouse = InventoryLocation::where('is_default', true)
+            ->where('is_active', true)
+            ->first();
+
+        return $defaultWarehouse ? $defaultWarehouse->postal_code : '110001'; // Fallback to Delhi
     }
 }
