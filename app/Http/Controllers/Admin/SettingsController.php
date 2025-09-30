@@ -4,77 +4,23 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\AdminSetting;
+use App\Models\PaymentSetting;
+use App\Models\PaymentConfiguration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
 class SettingsController extends Controller
 {
+    /**
+     * Get all settings grouped by category
+     */
     public function getGeneral()
     {
-        $settings = Cache::remember('general_settings', 3600, function () {
-            return [
-                'site_name' => config('app.name', 'BookBharat'),
-                'site_url' => config('app.url'),
-                'admin_email' => 'admin@bookbharat.com',
-                'support_email' => 'support@bookbharat.com',
-                'currency' => 'INR',
-                'currency_symbol' => '₹',
-                'timezone' => config('app.timezone', 'Asia/Kolkata'),
-                'date_format' => 'd/m/Y',
-                'time_format' => 'H:i',
-                'order_prefix' => 'ORD',
-                'invoice_prefix' => 'INV',
-                'tax_enabled' => true,
-                'gst_number' => 'GSTIN123456789',
-                'shipping_enabled' => true,
-                'cod_enabled' => true,
-                'online_payment_enabled' => true,
-                'min_order_amount' => 100,
-                'max_order_amount' => 100000,
-                'free_shipping_threshold' => 500,
-                'maintenance_mode' => false,
-                'allow_guest_checkout' => true,
-                'auto_approve_reviews' => false,
-                'enable_wishlist' => true,
-                'enable_compare' => true,
-                'enable_coupons' => true,
-                'enable_loyalty_program' => false,
-                'items_per_page' => 20,
-                'max_upload_size' => 5, // MB
-                'allowed_image_types' => ['jpg', 'jpeg', 'png', 'webp'],
-                'smtp_settings' => [
-                    'host' => config('mail.mailers.smtp.host'),
-                    'port' => config('mail.mailers.smtp.port'),
-                    'encryption' => config('mail.mailers.smtp.encryption'),
-                    'from_address' => config('mail.from.address'),
-                    'from_name' => config('mail.from.name'),
-                ],
-                'payment_gateways' => [
-                    'razorpay' => [
-                        'enabled' => true,
-                        'test_mode' => true,
-                        'key' => 'rzp_test_xxxxx',
-                    ],
-                    'cashfree' => [
-                        'enabled' => true,
-                        'test_mode' => true,
-                        'app_id' => 'cf_test_xxxxx',
-                    ],
-                    'cod' => [
-                        'enabled' => true,
-                        'extra_charge' => 50,
-                    ]
-                ],
-                'social_links' => [
-                    'facebook' => 'https://facebook.com/bookbharat',
-                    'twitter' => 'https://twitter.com/bookbharat',
-                    'instagram' => 'https://instagram.com/bookbharat',
-                    'linkedin' => 'https://linkedin.com/company/bookbharat',
-                ],
-            ];
-        });
+        $settings = AdminSetting::getAllGrouped();
 
         return response()->json([
             'success' => true,
@@ -82,26 +28,178 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function updateGeneral(Request $request)
+    /**
+     * Get settings for a specific group
+     */
+    public function getByGroup(Request $request, string $group)
     {
-        $request->validate([
-            'site_name' => 'sometimes|string|max:255',
-            'admin_email' => 'sometimes|email',
-            'support_email' => 'sometimes|email',
-            'min_order_amount' => 'sometimes|numeric|min:0',
-            'max_order_amount' => 'sometimes|numeric|min:0',
-            'free_shipping_threshold' => 'sometimes|numeric|min:0',
-            'items_per_page' => 'sometimes|integer|min:10|max:100',
-        ]);
-
-        // In a real application, you would save these to a database
-        // For now, we'll just clear the cache and return success
-        Cache::forget('general_settings');
+        $settings = AdminSetting::getByGroup($group);
 
         return response()->json([
             'success' => true,
-            'message' => 'Settings updated successfully'
+            'group' => $group,
+            'settings' => $settings
         ]);
+    }
+
+    /**
+     * Get public settings (for frontend)
+     */
+    public function getPublicSettings()
+    {
+        $settings = AdminSetting::where('is_public', true)
+            ->get()
+            ->keyBy('key')
+            ->map(function ($setting) {
+                return AdminSetting::get($setting->key);
+            });
+
+        return response()->json([
+            'success' => true,
+            'settings' => $settings
+        ]);
+    }
+
+    /**
+     * Update multiple settings
+     */
+    public function updateGeneral(Request $request)
+    {
+        $settings = $request->input('settings', []);
+        $updated = [];
+        $errors = [];
+
+        foreach ($settings as $key => $value) {
+            // Validate that the setting exists and is editable
+            $setting = AdminSetting::where('key', $key)->where('is_editable', true)->first();
+
+            if (!$setting) {
+                $errors[$key] = 'Setting not found or not editable';
+                continue;
+            }
+
+            // Basic validation based on setting type
+            $validator = $this->validateSettingValue($key, $value, $setting);
+
+            if ($validator && $validator->fails()) {
+                $errors[$key] = $validator->errors()->first();
+                continue;
+            }
+
+            // Update the setting
+            if (AdminSetting::set($key, $value)) {
+                $updated[$key] = $value;
+            } else {
+                $errors[$key] = 'Failed to update setting';
+            }
+        }
+
+        if (!empty($errors)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Some settings failed to update',
+                'updated' => $updated,
+                'errors' => $errors
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Settings updated successfully',
+            'updated' => $updated
+        ]);
+    }
+
+    /**
+     * Update a single setting
+     */
+    public function updateSetting(Request $request, string $key)
+    {
+        $setting = AdminSetting::where('key', $key)->where('is_editable', true)->first();
+
+        if (!$setting) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Setting not found or not editable'
+            ], 404);
+        }
+
+        $value = $request->input('value');
+
+        // Validate the value
+        $validator = $this->validateSettingValue($key, $value, $setting);
+
+        if ($validator && $validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Update the setting
+        if (AdminSetting::set($key, $value)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Setting updated successfully',
+                'key' => $key,
+                'value' => AdminSetting::get($key)
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to update setting'
+        ], 500);
+    }
+
+    /**
+     * Validate setting value based on type
+     */
+    private function validateSettingValue(string $key, $value, $setting)
+    {
+        $rules = [];
+
+        switch ($setting->type) {
+            case 'string':
+                $rules[$key] = 'required|string|max:500';
+                break;
+            case 'integer':
+                $rules[$key] = 'required|integer';
+                break;
+            case 'boolean':
+                $rules[$key] = 'required|boolean';
+                break;
+            case 'array':
+            case 'json':
+                $rules[$key] = 'required|array';
+                break;
+        }
+
+        // Additional validation based on input type
+        switch ($setting->input_type) {
+            case 'email':
+                $rules[$key] = 'required|email|max:255';
+                break;
+            case 'url':
+                $rules[$key] = 'required|url|max:500';
+                break;
+            case 'number':
+                $rules[$key] = 'required|numeric|min:0';
+                break;
+            case 'select':
+            case 'radio':
+                if ($setting->options && is_array($setting->options)) {
+                    $rules[$key] = 'required|in:' . implode(',', array_keys($setting->options));
+                }
+                break;
+        }
+
+        if (empty($rules)) {
+            return null;
+        }
+
+        return Validator::make([$key => $value], $rules);
     }
 
     public function getRoles()
@@ -262,51 +360,121 @@ class SettingsController extends Controller
 
     public function getPayment()
     {
-        $settings = [
-            'gateways' => [
-                [
-                    'id' => 'razorpay',
-                    'name' => 'Razorpay',
-                    'enabled' => true,
-                    'test_mode' => true,
-                    'supported_currencies' => ['INR', 'USD'],
-                    'transaction_fee' => '2%',
-                    'min_amount' => 100,
-                    'max_amount' => 100000,
-                ],
-                [
-                    'id' => 'cashfree',
-                    'name' => 'Cashfree',
-                    'enabled' => true,
-                    'test_mode' => true,
-                    'supported_currencies' => ['INR'],
-                    'transaction_fee' => '1.95%',
-                    'min_amount' => 100,
-                    'max_amount' => 200000,
-                ],
-                [
-                    'id' => 'cod',
-                    'name' => 'Cash on Delivery',
-                    'enabled' => true,
-                    'test_mode' => false,
-                    'extra_charge' => 50,
-                    'max_amount' => 10000,
-                ],
-            ],
-            'tax_settings' => [
-                'tax_enabled' => true,
-                'tax_type' => 'GST',
-                'tax_rates' => [
-                    ['category' => 'Books', 'rate' => 0],
-                    ['category' => 'E-books', 'rate' => 18],
-                    ['category' => 'Stationery', 'rate' => 12],
-                ],
-            ],
-        ];
+        // Get PaymentSettings (Gateway configurations)
+        $paymentSettings = PaymentSetting::orderBy('priority', 'asc')->get()->map(function ($setting) {
+            return [
+                'id' => $setting->id,
+                'keyword' => $setting->unique_keyword,
+                'name' => $setting->name,
+                'description' => $setting->description,
+                'is_active' => $setting->is_active,
+                'is_production' => $setting->is_production,
+                'supported_currencies' => $setting->supported_currencies,
+                'configuration' => $setting->configuration,
+                'webhook_config' => $setting->webhook_config,
+                'priority' => $setting->priority,
+                'created_at' => $setting->created_at,
+                'updated_at' => $setting->updated_at,
+            ];
+        });
+
+        // Get PaymentConfigurations (Method configurations for orders)
+        $paymentMethods = PaymentConfiguration::orderBy('priority', 'desc')->get()->map(function ($config) {
+            return [
+                'id' => $config->id,
+                'payment_method' => $config->payment_method,
+                'display_name' => $config->display_name,
+                'description' => $config->description,
+                'is_enabled' => $config->is_enabled,
+                'priority' => $config->priority,
+                'configuration' => $config->configuration,
+                'restrictions' => $config->restrictions,
+                'created_at' => $config->created_at,
+                'updated_at' => $config->updated_at,
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'settings' => $settings
+            'data' => [
+                'payment_settings' => $paymentSettings,
+                'payment_methods' => $paymentMethods,
+                'stats' => [
+                    'active_gateways' => PaymentSetting::where('is_active', true)->count(),
+                    'enabled_methods' => PaymentConfiguration::where('is_enabled', true)->count(),
+                    'production_gateways' => PaymentSetting::where('is_production', true)->count(),
+                ]
+            ]
+        ]);
+    }
+
+    public function updatePaymentSetting(Request $request, PaymentSetting $paymentSetting)
+    {
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'configuration' => 'sometimes|array',
+            'is_active' => 'sometimes|boolean',
+            'is_production' => 'sometimes|boolean',
+            'supported_currencies' => 'sometimes|array',
+            'webhook_config' => 'sometimes|array',
+            'priority' => 'sometimes|integer',
+        ]);
+
+        $paymentSetting->update($request->only([
+            'name', 'description', 'configuration', 'is_active',
+            'is_production', 'supported_currencies', 'webhook_config', 'priority'
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment setting updated successfully',
+            'data' => $paymentSetting
+        ]);
+    }
+
+    public function updatePaymentConfiguration(Request $request, PaymentConfiguration $paymentConfiguration)
+    {
+        $request->validate([
+            'display_name' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'is_enabled' => 'sometimes|boolean',
+            'priority' => 'sometimes|integer',
+            'configuration' => 'sometimes|array',
+            'restrictions' => 'sometimes|array',
+        ]);
+
+        $paymentConfiguration->update($request->only([
+            'display_name', 'description', 'is_enabled',
+            'priority', 'configuration', 'restrictions'
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment method updated successfully',
+            'data' => $paymentConfiguration
+        ]);
+    }
+
+    public function togglePaymentSetting(Request $request, PaymentSetting $paymentSetting)
+    {
+        $paymentSetting->update(['is_active' => !$paymentSetting->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $paymentSetting->is_active ? 'Payment gateway enabled' : 'Payment gateway disabled',
+            'data' => $paymentSetting
+        ]);
+    }
+
+    public function togglePaymentConfiguration(Request $request, PaymentConfiguration $paymentConfiguration)
+    {
+        $paymentConfiguration->update(['is_enabled' => !$paymentConfiguration->is_enabled]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $paymentConfiguration->is_enabled ? 'Payment method enabled' : 'Payment method disabled',
+            'data' => $paymentConfiguration
         ]);
     }
 

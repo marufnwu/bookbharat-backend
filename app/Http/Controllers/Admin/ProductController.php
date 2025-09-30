@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\ProductAttribute;
 use App\Models\ProductVariant;
 use App\Services\InventoryService;
+use App\Services\ImageUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +19,12 @@ use Illuminate\Support\Str;
 class ProductController extends Controller
 {
     protected $inventoryService;
+    protected $imageUploadService;
 
-    public function __construct(InventoryService $inventoryService)
+    public function __construct(InventoryService $inventoryService, ImageUploadService $imageUploadService)
     {
         $this->inventoryService = $inventoryService;
+        $this->imageUploadService = $imageUploadService;
         // Middleware is already handled in routes
         // $this->middleware('permission:manage-products');
     }
@@ -106,8 +109,8 @@ class ProductController extends Controller
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',
             'meta_keywords' => 'nullable|string',
-            'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120',
+            'images' => 'nullable|array|max:10',
+            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120|dimensions:min_width=300,min_height=300,max_width=4000,max_height=4000',
             'tags' => 'nullable|array',
             'attributes' => 'nullable|array',
             'variants' => 'nullable|array',
@@ -128,14 +131,19 @@ class ProductController extends Controller
                 $request->merge(['slug' => $slug]);
             }
 
-            $product = Product::create($request->only([
+            $productData = $request->only([
                 'name', 'slug', 'sku', 'category_id', 'description', 'short_description',
                 'author', 'publisher', 'isbn', 'publication_date', 'language', 'pages',
                 'weight', 'dimensions', 'price', 'compare_price', 'cost_price',
                 'stock_quantity', 'low_stock_threshold', 'track_stock', 'allow_backorder',
                 'is_active', 'is_featured', 'meta_title', 'meta_description', 'meta_keywords',
                 'tags'
-            ]));
+            ]);
+
+            // Set status based on is_active field
+            $productData['status'] = $productData['is_active'] ? 'active' : 'draft';
+
+            $product = Product::create($productData);
 
             // Handle product attributes
             if ($request->has('attributes') && $request->input('attributes')) {
@@ -149,7 +157,8 @@ class ProductController extends Controller
 
             // Handle image uploads
             if ($request->hasFile('images')) {
-                $this->handleImageUploads($product, $request->file('images'));
+                $altTexts = $request->input('alt_text', []);
+                $this->handleImageUploads($product, $request->file('images'), $altTexts);
             }
 
             // Update inventory
@@ -232,8 +241,8 @@ class ProductController extends Controller
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',
             'meta_keywords' => 'nullable|string',
-            'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120',
+            'images' => 'nullable|array|max:10',
+            'images.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120|dimensions:min_width=300,min_height=300,max_width=4000,max_height=4000',
             'existing_images' => 'nullable|array',
             'existing_images.*' => 'string',
             'tags' => 'nullable|array',
@@ -266,7 +275,8 @@ class ProductController extends Controller
 
             // Handle new image uploads
             if ($request->hasFile('images')) {
-                $this->handleImageUploads($product, $request->file('images'));
+                $altTexts = $request->input('alt_text', []);
+                $this->handleImageUploads($product, $request->file('images'), $altTexts);
             }
 
             // Update inventory if stock quantity changed
@@ -360,11 +370,11 @@ class ProductController extends Controller
 
             switch ($request->action) {
                 case 'activate':
-                    $count = $products->update(['is_active' => true]);
+                    $count = $products->update(['is_active' => true, 'status' => 'active']);
                     break;
 
                 case 'deactivate':
-                    $count = $products->update(['is_active' => false]);
+                    $count = $products->update(['is_active' => false, 'status' => 'draft']);
                     break;
 
                 case 'feature':
@@ -496,17 +506,25 @@ class ProductController extends Controller
             $images = [];
 
             foreach ($request->file('images') as $index => $file) {
-                $path = $file->store('products', 'public');
+                // Validate and upload image
+                $validationErrors = $this->imageUploadService->validateImage($file);
+                if (!empty($validationErrors)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Image validation failed: ' . implode(', ', $validationErrors)
+                    ], 400);
+                }
+
+                $imageResult = $this->imageUploadService->uploadImage($file, 'products');
 
                 $image = $product->images()->create([
-                    'image_path' => $path,
+                    'image_path' => $imageResult['path'],
                     'alt_text' => $request->input("alt_text.{$index}", ''),
                     'sort_order' => $product->images()->count() + $index,
                     'is_primary' => $index === 0 && !$product->images()->where('is_primary', true)->exists(),
                 ]);
 
-                $image->image_url = Storage::disk('public')->url($image->image_path);
-                $images[] = $image;
+                $images[] = $image->fresh(); // Fresh to get the image_url accessor
             }
 
             return response()->json([
@@ -531,10 +549,8 @@ class ProductController extends Controller
         try {
             $image = $product->images()->findOrFail($imageId);
 
-            // Delete file from storage
-            if (Storage::disk('public')->exists($image->image_path)) {
-                Storage::disk('public')->delete($image->image_path);
-            }
+            // Delete file from storage using ImageUploadService
+            $this->imageUploadService->deleteImage($image->image_path);
 
             $wasPrimary = $image->is_primary;
             $image->delete();
@@ -561,17 +577,107 @@ class ProductController extends Controller
     }
 
     /**
+     * Reorder product images
+     */
+    public function reorderImages(Request $request, Product $product)
+    {
+        $request->validate([
+            'image_orders' => 'required|array',
+            'image_orders.*.id' => 'required|exists:product_images,id',
+            'image_orders.*.sort_order' => 'required|integer|min:0',
+            'primary_image_id' => 'nullable|exists:product_images,id'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Update sort orders
+            foreach ($request->image_orders as $imageOrder) {
+                $product->images()
+                    ->where('id', $imageOrder['id'])
+                    ->update(['sort_order' => $imageOrder['sort_order']]);
+            }
+
+            // Update primary image if specified
+            if ($request->primary_image_id) {
+                // Remove primary status from all images
+                $product->images()->update(['is_primary' => false]);
+                // Set new primary image
+                $product->images()
+                    ->where('id', $request->primary_image_id)
+                    ->update(['is_primary' => true]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Images reordered successfully',
+                'images' => $product->images()->orderBy('sort_order')->get()
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reorder images: ' . $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Update image details (alt text, etc.)
+     */
+    public function updateImage(Request $request, Product $product, $imageId)
+    {
+        $request->validate([
+            'alt_text' => 'nullable|string|max:255',
+            'is_primary' => 'nullable|boolean'
+        ]);
+
+        try {
+            $image = $product->images()->findOrFail($imageId);
+
+            // If setting as primary, remove primary from other images
+            if ($request->is_primary) {
+                $product->images()->where('id', '!=', $imageId)->update(['is_primary' => false]);
+            }
+
+            $image->update($request->only(['alt_text', 'is_primary']));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Image updated successfully',
+                'image' => $image->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update image: ' . $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
      * Toggle product status
      */
     public function toggleStatus(Product $product)
     {
         try {
-            $product->update(['is_active' => !$product->is_active]);
+            $newIsActive = !$product->is_active;
+            $newStatus = $newIsActive ? 'active' : 'draft';
+
+            $product->update([
+                'is_active' => $newIsActive,
+                'status' => $newStatus
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Product status updated successfully',
-                'is_active' => $product->is_active
+                'is_active' => $product->is_active,
+                'status' => $product->status
             ]);
 
         } catch (\Exception $e) {
@@ -671,17 +777,36 @@ class ProductController extends Controller
     /**
      * Handle image uploads during product creation/update
      */
-    protected function handleImageUploads(Product $product, array $files)
+    protected function handleImageUploads(Product $product, array $files, array $altTexts = [])
     {
         foreach ($files as $index => $file) {
-            $path = $file->store('products', 'public');
+            try {
+                // Validate image first
+                $validationErrors = $this->imageUploadService->validateImage($file);
+                if (!empty($validationErrors)) {
+                    throw new \Exception('Image validation failed: ' . implode(', ', $validationErrors));
+                }
 
-            $product->images()->create([
-                'image_path' => $path,
-                'alt_text' => '',
-                'sort_order' => $product->images()->count() + $index,
-                'is_primary' => $index === 0 && !$product->images()->where('is_primary', true)->exists(),
-            ]);
+                // Upload and optimize image
+                $imageResult = $this->imageUploadService->uploadImage($file, 'products', [
+                    'max_width' => 1920,
+                    'max_height' => 1920,
+                    'quality' => 85,
+                    'generate_thumbnails' => true
+                ]);
+
+                $product->images()->create([
+                    'image_path' => $imageResult['path'],
+                    'alt_text' => $altTexts[$index] ?? '',
+                    'sort_order' => $product->images()->count() + $index,
+                    'is_primary' => $index === 0 && !$product->images()->where('is_primary', true)->exists(),
+                ]);
+
+            } catch (\Exception $e) {
+                // Log error but continue with other images
+                \Log::error('Failed to upload product image: ' . $e->getMessage());
+                throw $e; // Re-throw to fail the entire operation for now
+            }
         }
     }
 

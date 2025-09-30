@@ -16,15 +16,22 @@ class ConfigurationController extends Controller
     public function getSiteConfig()
     {
         $config = Cache::remember('site_config', 3600, function () {
+            // Get saved configurations or fallback to defaults
+            $siteConfig = SiteConfiguration::getByGroup('site');
+            $themeConfig = SiteConfiguration::getByGroup('theme');
+            $featuresConfig = SiteConfiguration::getByGroup('features');
+            $socialConfig = SiteConfiguration::getByGroup('social');
+            $seoConfig = SiteConfiguration::getByGroup('seo');
+
             return [
                 'site' => [
-                    'name' => config('app.name', 'BookBharat'),
-                    'description' => 'India\'s Premier Online Bookstore',
-                    'logo' => asset('images/logo.png'),
-                    'favicon' => asset('images/favicon.ico'),
-                    'contact_email' => 'support@bookbharaqqqt.com',
-                    'contact_phone' => '+91 9876543210',
-                    'address' => [
+                    'name' => $siteConfig['name'] ?? config('app.name', 'BookBharat'),
+                    'description' => $siteConfig['description'] ?? 'India\'s Premier Online Bookstore',
+                    'logo' => $siteConfig['logo'] ?? asset('images/logo.png'),
+                    'favicon' => $siteConfig['favicon'] ?? asset('images/favicon.ico'),
+                    'contact_email' => $siteConfig['contact_email'] ?? 'support@bookbharat.com',
+                    'contact_phone' => $siteConfig['contact_phone'] ?? '+91 9876543210',
+                    'address' => $siteConfig['address'] ?? [
                         'line1' => 'BookBharat HQ',
                         'line2' => '123 Knowledge Street',
                         'city' => 'Mumbai',
@@ -34,29 +41,29 @@ class ConfigurationController extends Controller
                     ]
                 ],
                 'theme' => [
-                    'primary_color' => '#1e40af',
-                    'secondary_color' => '#f59e0b',
-                    'accent_color' => '#10b981',
-                    'success_color' => '#10b981',
-                    'warning_color' => '#f59e0b',
-                    'error_color' => '#ef4444',
-                    'font_family' => 'Inter, sans-serif',
-                    'header_style' => 'standard',
-                    'footer_style' => 'standard',
-                    'layout' => 'standard',
-                    'banner_style' => 'gradient'
+                    'primary_color' => $themeConfig['primary_color'] ?? '#1e40af',
+                    'secondary_color' => $themeConfig['secondary_color'] ?? '#f59e0b',
+                    'accent_color' => $themeConfig['accent_color'] ?? '#10b981',
+                    'success_color' => $themeConfig['success_color'] ?? '#10b981',
+                    'warning_color' => $themeConfig['warning_color'] ?? '#f59e0b',
+                    'error_color' => $themeConfig['error_color'] ?? '#ef4444',
+                    'font_family' => $themeConfig['font_family'] ?? 'Inter, sans-serif',
+                    'header_style' => $themeConfig['header_style'] ?? 'standard',
+                    'footer_style' => $themeConfig['footer_style'] ?? 'standard',
+                    'layout' => $themeConfig['layout'] ?? 'standard',
+                    'banner_style' => $themeConfig['banner_style'] ?? 'gradient'
                 ],
                 'features' => [
-                    'wishlist_enabled' => true,
-                    'reviews_enabled' => true,
-                    'chat_support_enabled' => true,
-                    'notifications_enabled' => true,
-                    'newsletter_enabled' => true,
-                    'social_login_enabled' => true,
-                    'guest_checkout_enabled' => true,
-                    'multi_currency_enabled' => false,
-                    'inventory_tracking_enabled' => true,
-                    'promotional_banners_enabled' => true
+                    'wishlist_enabled' => $featuresConfig['wishlist_enabled'] ?? true,
+                    'reviews_enabled' => $featuresConfig['reviews_enabled'] ?? true,
+                    'chat_support_enabled' => $featuresConfig['chat_support_enabled'] ?? true,
+                    'notifications_enabled' => $featuresConfig['notifications_enabled'] ?? true,
+                    'newsletter_enabled' => $featuresConfig['newsletter_enabled'] ?? true,
+                    'social_login_enabled' => $featuresConfig['social_login_enabled'] ?? true,
+                    'guest_checkout_enabled' => $featuresConfig['guest_checkout_enabled'] ?? true,
+                    'multi_currency_enabled' => $featuresConfig['multi_currency_enabled'] ?? false,
+                    'inventory_tracking_enabled' => $featuresConfig['inventory_tracking_enabled'] ?? true,
+                    'promotional_banners_enabled' => $featuresConfig['promotional_banners_enabled'] ?? true
                 ],
                 'payment' => [
                     'methods_enabled' => [
@@ -367,5 +374,57 @@ class ConfigurationController extends Controller
         ])->header('Access-Control-Allow-Origin', '*')
           ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
           ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+    }
+
+    /**
+     * Update site configuration
+     */
+    public function updateSiteConfig(Request $request)
+    {
+        try {
+            \Log::info('Site config update request data:', $request->all());
+
+            $validated = $request->validate([
+                'site' => 'sometimes|array',
+                'theme' => 'sometimes|array',
+                'features' => 'sometimes|array',
+                'social' => 'sometimes|array',
+                'seo' => 'sometimes|array',
+            ]);
+
+            \Log::info('Validated data:', $validated);
+
+            // Update each configuration group
+            foreach ($validated as $group => $config) {
+                \Log::info("Processing group: $group with config:", $config);
+                foreach ($config as $key => $value) {
+                    \Log::info("Setting key: $key = $value in group: $group");
+                    $result = SiteConfiguration::setValue($key, $value, $group);
+                    \Log::info("Save result:", $result->toArray());
+                }
+            }
+
+            // Clear the cache to force refresh
+            Cache::forget('site_config');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Site configuration updated successfully'
+            ])->header('Access-Control-Allow-Origin', '*')
+              ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+              ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while updating configuration'
+            ], 500);
+        }
     }
 }

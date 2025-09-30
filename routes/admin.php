@@ -15,10 +15,8 @@ use App\Http\Controllers\Admin\ConfigurationController;
 use App\Http\Controllers\Admin\ContentController;
 use App\Http\Controllers\Admin\ContentModerationController;
 use App\Http\Controllers\Admin\BundleDiscountController;
-use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\ReviewController;
-use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\AuthController;
@@ -66,6 +64,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/{product}/duplicate', [ProductController::class, 'duplicate']);
         Route::post('/{product}/images', [ProductController::class, 'uploadImages']);
         Route::delete('/{product}/images/{image}', [ProductController::class, 'deleteImage']);
+        Route::put('/{product}/images/{image}', [ProductController::class, 'updateImage']);
+        Route::post('/{product}/images/reorder', [ProductController::class, 'reorderImages']);
         Route::put('/{product}/toggle-status', [ProductController::class, 'toggleStatus']);
         Route::put('/{product}/toggle-featured', [ProductController::class, 'toggleFeatured']);
         Route::get('/{product}/analytics', [ProductController::class, 'analytics']);
@@ -269,6 +269,15 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/theme-presets', [ContentController::class, 'getThemePresets']);
     });
 
+    // Configuration Management (from ConfigurationController)
+    Route::prefix('configuration')->group(function () {
+        Route::get('/site-config', [ConfigurationController::class, 'getSiteConfig']);
+        Route::put('/site-config', [ConfigurationController::class, 'updateSiteConfig']);
+        Route::get('/homepage-config', [ConfigurationController::class, 'getHomepageConfig']);
+        Route::get('/navigation-config', [ConfigurationController::class, 'getNavigationConfig']);
+        Route::get('/content-page/{slug}', [ConfigurationController::class, 'getContentPage']);
+    });
+
     // Content Moderation
     Route::prefix('moderation')->group(function () {
         Route::get('/', [ContentModerationController::class, 'index']);
@@ -281,17 +290,17 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/analytics', [ContentModerationController::class, 'getContentAnalytics']);
     });
 
-    // Payment Management
-    Route::prefix('payments')->group(function () {
-        Route::get('/', [PaymentController::class, 'index']);
-        Route::get('/{payment}', [PaymentController::class, 'show']);
-        Route::post('/{payment}/refund', [PaymentController::class, 'refund']);
-        Route::get('/gateways', [PaymentController::class, 'getGateways']);
-        Route::put('/gateways/{gateway}', [PaymentController::class, 'updateGateway']);
-        Route::get('/transactions', [PaymentController::class, 'getTransactions']);
-        Route::get('/refunds', [PaymentController::class, 'getRefunds']);
-        Route::get('/analytics', [PaymentController::class, 'getAnalytics']);
-    });
+    // Payment Management - TODO: Implement PaymentController
+    // Route::prefix('payments')->group(function () {
+    //     Route::get('/', [PaymentController::class, 'index']);
+    //     Route::get('/{payment}', [PaymentController::class, 'show']);
+    //     Route::post('/{payment}/refund', [PaymentController::class, 'refund']);
+    //     Route::get('/gateways', [PaymentController::class, 'getGateways']);
+    //     Route::put('/gateways/{gateway}', [PaymentController::class, 'updateGateway']);
+    //     Route::get('/transactions', [PaymentController::class, 'getTransactions']);
+    //     Route::get('/refunds', [PaymentController::class, 'getRefunds']);
+    //     Route::get('/analytics', [PaymentController::class, 'getAnalytics']);
+    // });
 
     // Reports
     Route::prefix('reports')->group(function () {
@@ -322,6 +331,17 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::prefix('settings')->group(function () {
         Route::get('/general', [SettingsController::class, 'getGeneral']);
         Route::put('/general', [SettingsController::class, 'updateGeneral']);
+        Route::get('/group/{group}', [SettingsController::class, 'getByGroup']);
+        Route::put('/setting/{key}', [SettingsController::class, 'updateSetting']);
+        Route::get('/public', [SettingsController::class, 'getPublicSettings']);
+
+        // Payment Settings
+        Route::get('/payment', [SettingsController::class, 'getPayment']);
+        Route::put('/payment-settings/{paymentSetting}', [SettingsController::class, 'updatePaymentSetting']);
+        Route::put('/payment-configurations/{paymentConfiguration}', [SettingsController::class, 'updatePaymentConfiguration']);
+        Route::post('/payment-settings/{paymentSetting}/toggle', [SettingsController::class, 'togglePaymentSetting']);
+        Route::post('/payment-configurations/{paymentConfiguration}/toggle', [SettingsController::class, 'togglePaymentConfiguration']);
+
         Route::get('/email', [SettingsController::class, 'getEmail']);
         Route::put('/email', [SettingsController::class, 'updateEmail']);
         Route::get('/sms', [SettingsController::class, 'getSms']);

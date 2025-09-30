@@ -11,7 +11,14 @@
       "Bash(npx tailwindcss init:*)",
       "Bash(npm install:*)",
       "Bash(find:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(composer show:*)",
+      "Read(//d/bookbharat-v2/bookbharat-frontend/public/**)",
+      "Read(//d/bookbharat-v2/bookbharat-frontend/**)",
+      "Bash(netstat:*)",
+      "Read(//d/bookbharat-v2/.claude/**)",
+      "Bash(lsof:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

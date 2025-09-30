@@ -111,40 +111,38 @@ class SystemTestSeeder extends Seeder
     {
         $categories = Category::all();
 
-        // Use local storage URLs for book images
-        $baseUrl = config('app.url') . '/storage/book-covers/';
-
-        // Create placeholder image paths using local storage
+        // Use storage paths (not full URLs) for book images
+        // The ProductImage model will generate the full URL via the image_url accessor
         $bookImages = [
             'fiction' => [
-                $baseUrl . 'placeholder-fiction-1.jpg',
-                $baseUrl . 'placeholder-fiction-2.jpg',
-                $baseUrl . 'placeholder-fiction-3.jpg'
+                'book-covers/placeholder-fiction-1.jpg',
+                'book-covers/placeholder-fiction-2.jpg',
+                'book-covers/placeholder-fiction-3.jpg'
             ],
             'non-fiction' => [
-                $baseUrl . 'placeholder-nonfiction-1.jpg',
-                $baseUrl . 'placeholder-nonfiction-2.jpg',
-                $baseUrl . 'placeholder-nonfiction-3.jpg'
+                'book-covers/placeholder-nonfiction-1.jpg',
+                'book-covers/placeholder-nonfiction-2.jpg',
+                'book-covers/placeholder-nonfiction-3.jpg'
             ],
             'mystery' => [
-                $baseUrl . 'placeholder-mystery-1.jpg',
-                $baseUrl . 'placeholder-mystery-2.jpg',
-                $baseUrl . 'placeholder-mystery-3.jpg'
+                'book-covers/placeholder-mystery-1.jpg',
+                'book-covers/placeholder-mystery-2.jpg',
+                'book-covers/placeholder-mystery-3.jpg'
             ],
             'romance' => [
-                $baseUrl . 'placeholder-romance-1.jpg',
-                $baseUrl . 'placeholder-romance-2.jpg',
-                $baseUrl . 'placeholder-romance-3.jpg'
+                'book-covers/placeholder-romance-1.jpg',
+                'book-covers/placeholder-romance-2.jpg',
+                'book-covers/placeholder-romance-3.jpg'
             ],
             'scifi' => [
-                $baseUrl . 'placeholder-scifi-1.jpg',
-                $baseUrl . 'placeholder-scifi-2.jpg',
-                $baseUrl . 'placeholder-scifi-3.jpg'
+                'book-covers/placeholder-scifi-1.jpg',
+                'book-covers/placeholder-scifi-2.jpg',
+                'book-covers/placeholder-scifi-3.jpg'
             ],
             'biography' => [
-                $baseUrl . 'placeholder-biography-1.jpg',
-                $baseUrl . 'placeholder-biography-2.jpg',
-                $baseUrl . 'placeholder-biography-3.jpg'
+                'book-covers/placeholder-biography-1.jpg',
+                'book-covers/placeholder-biography-2.jpg',
+                'book-covers/placeholder-biography-3.jpg'
             ]
         ];
 
@@ -400,15 +398,9 @@ class SystemTestSeeder extends Seeder
                 // Get appropriate images for this book type
                 $images = $bookImages[$imageSet] ?? $bookImages['fiction'];
 
-                // Add primary image with book title
-                $primaryImageUrl = str_replace(
-                    '?text=' . urlencode(ucfirst($imageSet) . '+Book'),
-                    '?text=' . urlencode(str_replace(['-', '_'], ' ', $product->slug)),
-                    $images[0]
-                );
-
+                // Add primary image - use the storage path directly
                 $product->images()->create([
-                    'image_path' => $primaryImageUrl,
+                    'image_path' => $images[0],
                     'alt_text' => $product->name . ' - Cover',
                     'sort_order' => 1,
                     'is_primary' => true

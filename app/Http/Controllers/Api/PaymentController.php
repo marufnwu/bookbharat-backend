@@ -52,6 +52,70 @@ class PaymentController extends Controller
     }
 
     /**
+     * Initiate payment for an order
+     */
+    public function initiatePayment(Request $request)
+    {
+        try {
+            $request->validate([
+                'order_id' => 'required|exists:orders,id',
+                'gateway' => 'required|string',
+                'return_url' => 'nullable|url',
+                'cancel_url' => 'nullable|url'
+            ]);
+
+            $order = Order::findOrFail($request->order_id);
+
+            // Check if order is eligible for payment
+            if ($order->payment_status === 'paid') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order is already paid'
+                ], 400);
+            }
+
+            // Create gateway instance
+            $gatewayInstance = PaymentGatewayFactory::create($request->gateway);
+            if (!$gatewayInstance) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment gateway not found'
+                ], 404);
+            }
+
+            // Initiate payment
+            $result = $gatewayInstance->initiatePayment($order, [
+                'return_url' => $request->return_url,
+                'cancel_url' => $request->cancel_url
+            ]);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $result['data'],
+                    'message' => $result['message'] ?? 'Payment initiated successfully'
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Failed to initiate payment'
+            ], 400);
+
+        } catch (\Exception $e) {
+            Log::error('Payment initiation failed', [
+                'error' => $e->getMessage(),
+                'order_id' => $request->order_id ?? null
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initiate payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Handle payment gateway callback (frontend redirect)
      * This is called when user is redirected back from payment gateway
      */

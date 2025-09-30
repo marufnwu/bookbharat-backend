@@ -204,27 +204,16 @@ class OrderController extends Controller
             // Check if this is COD or requires redirect
             $requiresRedirect = !in_array($request->payment_method, ['cod']);
 
-            // Extract payment data from nested structure
-            // PaymentService returns: payment_data => { success, data: {...gateway fields}, message }
-            $gatewayData = $paymentResult['payment_data']['data'] ?? $paymentResult['payment_data'] ?? [];
-            $paymentUrl = $gatewayData['payment_url'] ?? null;
-            $paymentSessionId = $gatewayData['payment_session_id'] ?? $gatewayData['session_id'] ?? null;
-
             return response()->json([
                 'success' => true,
                 'message' => $requiresRedirect ? 'Redirecting to payment gateway' : 'Order placed successfully',
                 'order' => $order->load(['orderItems.product']),
-                'payment_details' => [
-                    'payment_method' => $paymentResult['payment_method'],
-                    'transaction_id' => $paymentResult['transaction_id'],
-                    'payment_url' => $paymentUrl,
-                    'payment_data' => $gatewayData,
-                    'message' => $paymentResult['message'] ?? 'Payment initiated'
-                ],
+                'payment_details' => $paymentResult,
                 'requires_redirect' => $requiresRedirect,
-                'redirect_url' => $paymentUrl,
-                'payment_session_id' => $paymentSessionId
+                'redirect_url' => $paymentResult['payment_data']['payment_url'] ?? null,
+                'payment_session_id' => $paymentResult['payment_data']['payment_session_id'] ?? null
             ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([

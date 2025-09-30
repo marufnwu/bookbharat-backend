@@ -192,19 +192,6 @@ class Product extends Model
         return null;
     }
 
-    public function getImagesAttribute()
-    {
-        return $this->images()->get()->map(function ($image) {
-            return [
-                'id' => $image->id,
-                'image_path' => $image->image_path,
-                'image_url' => Storage::disk('public')->url($image->image_path),
-                'alt_text' => $image->alt_text,
-                'sort_order' => $image->sort_order,
-                'is_primary' => $image->is_primary,
-            ];
-        });
-    }
 
     public function getDiscountPercentageAttribute()
     {

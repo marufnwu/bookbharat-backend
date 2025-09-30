@@ -93,6 +93,9 @@ Route::prefix('v1')->group(function () {
     Route::prefix('payment')->group(function () {
         Route::get('/gateways', [PaymentController::class, 'getAvailablePaymentMethods']);
         Route::get('/methods', [PaymentController::class, 'getAvailablePaymentMethods']); // Alias for compatibility
+        // Initiate payment
+        Route::post('/initiate', [PaymentController::class, 'initiatePayment']);
+
 
         // Callback routes (when user returns from payment gateway)
         Route::any('/callback/{gateway}', [PaymentController::class, 'callback'])->name('payment.callback');

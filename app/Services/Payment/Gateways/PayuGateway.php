@@ -127,6 +127,7 @@ class PayuGateway extends BasePaymentGateway
             'udf5' => '',
         ];
 
+
         // Add optional fields
         if ($lastName) {
             $data['lastname'] = $lastName;
@@ -157,6 +158,7 @@ class PayuGateway extends BasePaymentGateway
     protected function generateRequestHash(array $data): string
     {
         $salt = $this->getConfig('salt');
+
 
         // PayU hash format: sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT)
         $hashString = $data['key'] . '|' .
