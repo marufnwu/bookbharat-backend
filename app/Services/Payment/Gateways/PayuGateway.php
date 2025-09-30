@@ -272,79 +272,46 @@ class PayuGateway extends BasePaymentGateway
     public function processCallback(Request $request): array
     {
         try {
-            $this->logActivity('Callback received', $request->all());
+            $this->logActivity('Callback received (USER REDIRECT - NO DB UPDATES)', $request->all());
 
             // Validate response hash
             if (!$this->validateResponseHash($request)) {
+                $this->logActivity('Hash validation FAILED', [], 'error');
                 throw new \Exception('Invalid payment response signature');
             }
+
+            $this->logActivity('Hash validation passed', [], 'info');
 
             $status = $request->input('status');
             $orderId = $request->input('udf1');
             $txnId = $request->input('txnid');
-            $mihpayid = $request->input('mihpayid');
+            $orderNumber = $request->input('udf2'); // Order number stored in udf2
 
-            // Find order
+            $this->logActivity('Callback validated - returning data for redirect', [
+                'status' => $status,
+                'order_id' => $orderId,
+                'txnid' => $txnId
+            ]);
+
+            // Find order to get order number
             $order = Order::find($orderId);
             if (!$order) {
                 throw new \Exception('Order not found');
             }
 
-            // Find or create payment record
-            $payment = Payment::where('order_id', $orderId)
-                ->where('payment_data->payu_txnid', $txnId)
-                ->first();
+            // IMPORTANT: Don't update anything in database
+            // Let webhook handle all updates
+            // Just return validation result for redirect
 
-            if (!$payment) {
-                $payment = Payment::where('order_id', $orderId)
-                    ->where('gateway', 'payu')
-                    ->latest()
-                    ->first();
-            }
-
-            if (!$payment) {
-                throw new \Exception('Payment record not found');
-            }
-
-            // Update payment based on status
-            if ($status === 'success') {
-                $this->updatePaymentRecord($payment, 'completed', [
-                    'payu_response' => $request->all(),
-                    'mihpayid' => $mihpayid,
-                    'paid_amount' => $request->input('amount'),
-                    'mode' => $request->input('mode'),
-                    'bank_ref_num' => $request->input('bank_ref_num'),
-                    'completed_at' => now()
-                ]);
-
-                $order->update([
-                    'payment_status' => 'paid',
-                    'payment_metadata' => array_merge($order->payment_metadata ?? [], [
-                        'mihpayid' => $mihpayid,
-                        'payment_mode' => $request->input('mode')
-                    ])
-                ]);
-
-                return $this->formatResponse(true, [
-                    'order_id' => $order->id,
-                    'payment_status' => 'completed',
-                    'transaction_id' => $txnId
-                ], 'Payment successful');
-
-            } else {
-                $this->updatePaymentRecord($payment, 'failed', [
-                    'payu_response' => $request->all(),
-                    'error' => $request->input('error_Message') ?? $request->input('field9'),
-                    'error_code' => $request->input('error_code') ?? $request->input('error'),
-                    'failed_at' => now()
-                ]);
-
-                return $this->formatResponse(false, [
-                    'order_id' => $order->id,
-                    'payment_status' => 'failed',
-                    'error' => $request->input('error_Message') ?? 'Payment failed'
-                ], 'Payment failed');
-            }
+            return $this->formatResponse(true, [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'gateway_status' => $status, // PayU's status (not our DB status)
+                'transaction_id' => $txnId,
+                'message' => $status === 'success'
+                    ? 'Payment completed. Please wait for confirmation.'
+                    : ($request->input('error_Message') ?? 'Payment failed')
+            ], $status === 'success' ? 'Payment callback received' : 'Payment failed');
 
         } catch (\Exception $e) {
             return $this->handleException($e, 'processCallback');

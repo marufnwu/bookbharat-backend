@@ -129,37 +129,51 @@ class PaymentController extends Controller
                 throw new \Exception("Payment gateway {$gateway} not found");
             }
 
-            // Process the callback
+            // Process the callback - ONLY validates signature, doesn't update DB
             $result = $gatewayInstance->processCallback($request);
 
-            if ($result['success']) {
-                // Find the order
-                $orderId = $result['order_id'] ?? $request->input('order_id');
-                $order = Order::find($orderId);
+            // Extract data from formatted response
+            $data = $result['data'] ?? [];
+            $gatewayStatus = $data['gateway_status'] ?? 'unknown'; // PayU/Razorpay status
+            $orderId = $data['order_id'] ?? $request->input('order_id');
+            $orderNumber = $data['order_number'] ?? null;
 
-                if ($order && $result['payment_status'] === 'completed') {
-                    // Payment successful - clear cart
-                    $sessionId = $request->header('X-Session-ID');
-                    $this->cartService->clearCart($order->user_id, $sessionId);
-
-                    // Start order workflow
-                    $this->orderService->processOrderCreated($order);
-
-                    // Redirect to success page
-                    $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
-                    return redirect("{$frontendUrl}/payment/success?order_id={$order->order_number}");
-                }
+            if (!$result['success']) {
+                // Signature validation failed
+                $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+                return redirect("{$frontendUrl}/payment/failed?order_id={$orderNumber}&reason=" . urlencode($result['message'] ?? 'Invalid payment response'));
             }
 
-            // Payment failed or pending - redirect to appropriate page
-            $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
-            $status = $result['payment_status'] ?? 'failed';
-            $orderId = $result['order_id'] ?? '';
+            // Find the order and check ACTUAL database status
+            // Don't trust callback data - only trust webhook-updated DB status
+            $order = Order::find($orderId);
+            if (!$order) {
+                $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+                return redirect("{$frontendUrl}/payment/failed?error=Order+not+found");
+            }
 
-            if ($status === 'pending') {
-                return redirect("{$frontendUrl}/payment/pending?order_id={$orderId}");
+            $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+
+            // Check actual payment status from database (updated by webhook)
+            if ($order->payment_status === 'paid') {
+                // Payment confirmed by webhook - clear cart and redirect to success
+                $sessionId = $request->header('X-Session-ID');
+                $this->cartService->clearCart($order->user_id, $sessionId);
+
+                return redirect("{$frontendUrl}/payment/success?order_id={$order->order_number}");
+
+            } elseif ($gatewayStatus === 'success' && $order->payment_status === 'pending') {
+                // Gateway says success but webhook hasn't processed yet
+                // Redirect to processing/pending page that will poll for confirmation
+                return redirect("{$frontendUrl}/payment/pending?order_id={$order->order_number}&status=processing");
+
+            } elseif ($gatewayStatus === 'failure' || $gatewayStatus === 'failed') {
+                // Gateway explicitly says failed
+                return redirect("{$frontendUrl}/payment/failed?order_id={$order->order_number}&reason=" . urlencode($data['message'] ?? 'Payment failed'));
+
             } else {
-                return redirect("{$frontendUrl}/payment/failed?order_id={$orderId}&reason=" . urlencode($result['message'] ?? 'Payment failed'));
+                // Unknown status - redirect to pending
+                return redirect("{$frontendUrl}/payment/pending?order_id={$order->order_number}&status=verifying");
             }
 
         } catch (\Exception $e) {
@@ -205,15 +219,7 @@ class PaymentController extends Controller
             // Process the webhook
             $result = $gatewayInstance->processWebhook($request);
 
-            // For PayU webhooks, handle order updates directly in the gateway
-            // since it already updates order status
-            if ($gateway === 'payu') {
-                // PayU gateway handles all order updates internally
-                // Just return 200 OK to acknowledge receipt
-                return response('OK', 200);
-            }
-
-            // For other gateways, process normally
+            // Process order workflow for all gateways
             if ($result['success']) {
                 // Find the order and update its status
                 if (isset($result['order_id'])) {

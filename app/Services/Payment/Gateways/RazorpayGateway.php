@@ -52,7 +52,7 @@ class RazorpayGateway extends BasePaymentGateway
             // Create Razorpay order
             $razorpayOrder = $this->api->order->create([
                 'receipt' => $order->order_number,
-                'amount' => $order->payable_amount * 100, // Amount in paise
+                'amount' => $order->total_amount * 100, // Amount in paise
                 'currency' => $order->currency ?? 'INR',
                 'payment_capture' => 1,
                 'notes' => [
@@ -155,7 +155,7 @@ class RazorpayGateway extends BasePaymentGateway
     public function processCallback(Request $request): array
     {
         try {
-            $this->logActivity('processCallback', $request->all());
+            $this->logActivity('Callback received (USER REDIRECT - NO DB UPDATES)', $request->all());
 
             if (empty($request->razorpay_payment_id)) {
                 throw new \Exception('Payment ID not received');
@@ -170,7 +170,9 @@ class RazorpayGateway extends BasePaymentGateway
 
             try {
                 $this->api->utility->verifyPaymentSignature($attributes);
+                $this->logActivity('Signature verification passed', [], 'info');
             } catch (SignatureVerificationError $e) {
+                $this->logActivity('Signature verification FAILED', [], 'error');
                 throw new \Exception('Payment verification failed: ' . $e->getMessage());
             }
 
@@ -180,41 +182,30 @@ class RazorpayGateway extends BasePaymentGateway
                 throw new \Exception('Order not found');
             }
 
-            // Find payment record
-            $payment = Payment::where('payment_data->razorpay_order_id', $request->razorpay_order_id)
-                ->where('order_id', $order->id)
-                ->first();
-
-            if (!$payment) {
-                $payment = $this->createPaymentRecord($order, 'pending', [
-                    'razorpay_order_id' => $request->razorpay_order_id
-                ]);
-            }
-
-            // Fetch payment details from Razorpay
+            // Fetch payment status from Razorpay to determine gateway status
             $razorpayPayment = $this->api->payment->fetch($request->razorpay_payment_id);
+            $gatewayStatus = ($razorpayPayment->status === 'captured' || $razorpayPayment->status === 'authorized')
+                ? 'success'
+                : 'pending';
 
-            // Update payment record
-            $this->updatePaymentRecord($payment, 'completed', [
-                'razorpay_payment_id' => $request->razorpay_payment_id,
-                'razorpay_signature' => $request->razorpay_signature,
-                'payment_details' => $razorpayPayment->toArray(),
-                'payment_method_details' => $razorpayPayment->method ?? null,
-                'paid_amount' => $razorpayPayment->amount / 100
+            $this->logActivity('Callback validated - returning data for redirect', [
+                'order_id' => $order->id,
+                'gateway_status' => $gatewayStatus
             ]);
 
-            // Update order
-            $order->update([
-                'payment_status' => 'paid',
-                'payment_method' => 'razorpay',
-                'transaction_id' => $request->razorpay_payment_id
-            ]);
+            // IMPORTANT: Don't update anything in database
+            // Let webhook handle all updates
+            // Just return validation result for redirect
 
             return $this->formatResponse(true, [
-                'payment_id' => $payment->id,
                 'order_id' => $order->id,
-                'transaction_id' => $request->razorpay_payment_id
-            ], 'Payment successful');
+                'order_number' => $order->order_number,
+                'gateway_status' => $gatewayStatus,
+                'transaction_id' => $request->razorpay_payment_id,
+                'message' => $gatewayStatus === 'success'
+                    ? 'Payment completed. Please wait for confirmation.'
+                    : 'Payment pending verification.'
+            ], $gatewayStatus === 'success' ? 'Payment callback received' : 'Payment pending');
 
         } catch (\Exception $e) {
             return $this->handleException($e, 'processCallback');
@@ -279,7 +270,10 @@ class RazorpayGateway extends BasePaymentGateway
             ]);
         }
 
-        return $this->formatResponse(true, [], 'Payment captured');
+        return $this->formatResponse(true, [
+            'order_id' => $orderId,
+            'payment_status' => 'completed'
+        ], 'Payment captured');
     }
 
     protected function handlePaymentFailed($payload): array
@@ -302,7 +296,10 @@ class RazorpayGateway extends BasePaymentGateway
             }
         }
 
-        return $this->formatResponse(true, [], 'Payment failed processed');
+        return $this->formatResponse(true, [
+            'order_id' => $orderId,
+            'payment_status' => 'failed'
+        ], 'Payment failed processed');
     }
 
     protected function handleOrderPaid($payload): array
@@ -325,7 +322,10 @@ class RazorpayGateway extends BasePaymentGateway
             }
         }
 
-        return $this->formatResponse(true, [], 'Order paid processed');
+        return $this->formatResponse(true, [
+            'order_id' => $order ? $order->id : null,
+            'payment_status' => 'completed'
+        ], 'Order paid processed');
     }
 
     public function refundPayment(string $paymentId, float $amount, array $options = []): array
