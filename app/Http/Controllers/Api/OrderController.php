@@ -61,7 +61,7 @@ class OrderController extends Controller
                 'payment_method' => 'required|string',
                 'coupon_code' => 'nullable|string',
                 'notes' => 'nullable|string|max:500',
-                'shipping_cost' => 'nullable|numeric',
+                // REMOVED: shipping_cost - SECURITY: Never trust client for money calculations
             ]);
         } else {
             $request->validate([
@@ -86,7 +86,7 @@ class OrderController extends Controller
                 'payment_method' => 'required|string',
                 'coupon_code' => 'nullable|string',
                 'notes' => 'nullable|string|max:500',
-                'shipping_cost' => 'nullable|numeric',
+                // REMOVED: shipping_cost - SECURITY: Never trust client for money calculations
             ]);
         }
 
@@ -117,25 +117,32 @@ class OrderController extends Controller
                 }
             }
 
-            // Get cart summary
-            $cartSummary = $this->cartService->getCartSummary($userId, $sessionId);
-            
             // Get addresses
             if ($isAuthenticated) {
                 // For authenticated users, get addresses by ID and verify ownership
                 $shippingAddress = $user->addresses()->findOrFail($request->shipping_address_id);
                 $billingAddress = $user->addresses()->findOrFail($request->billing_address_id);
-                
+
                 $shippingAddressData = $shippingAddress->toArray();
                 $billingAddressData = $billingAddress->toArray();
+
+                // Get delivery pincode for shipping calculation
+                $deliveryPincode = $shippingAddress->postal_code;
             } else {
                 // For guest users, use provided address data
                 $shippingAddressData = $request->shipping_address;
                 $billingAddressData = $request->billing_address;
+
+                // Get delivery pincode for shipping calculation
+                $deliveryPincode = $request->shipping_address['postal_code'];
             }
 
-            // Use shipping cost from request if provided, otherwise from cart summary
-            $shippingAmount = $request->shipping_cost ?? $cartSummary['shipping_cost'];
+            // SECURITY: Always calculate shipping server-side, NEVER trust client
+            // Recalculate cart summary with proper shipping based on delivery address
+            $cartSummary = $this->cartService->getCartSummary($userId, $sessionId, $deliveryPincode);
+
+            // Use server-calculated shipping amount (NEVER from client)
+            $shippingAmount = $cartSummary['shipping_cost'];
             $discountAmount = $cartSummary['coupon_discount'] ?? 0;
             $totalAmount = $cartSummary['discounted_subtotal'] + $cartSummary['tax_amount'] + $shippingAmount;
 

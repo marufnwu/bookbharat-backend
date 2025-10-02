@@ -67,11 +67,14 @@ class ShippingService
             }
             
             // Apply free shipping rules
-            $freeShippingThreshold = $this->getFreeShippingThreshold($zone);
+            $freeShippingConfig = $this->getFreeShippingConfig($zone);
             $finalOptions = [];
-            
+
             foreach ($shippingOptions as $option) {
-                $finalCost = $orderValue >= $freeShippingThreshold ? 0 : $option['total_cost'];
+                // Apply free shipping only if enabled and threshold is met
+                $isFreeShipping = $freeShippingConfig['enabled'] &&
+                                  $orderValue >= $freeShippingConfig['threshold'];
+                $finalCost = $isFreeShipping ? 0 : $option['total_cost'];
                 $finalOptions[] = array_merge($option, [
                     'final_cost' => round($finalCost, 2),
                     'is_free_shipping' => $finalCost == 0
@@ -92,7 +95,8 @@ class ShippingService
                 'dimensional_weight' => $weightData['dimensional_weight'],
                 'billable_weight' => $billableWeight,
                 'shipping_options' => $finalOptions,
-                'free_shipping_threshold' => $freeShippingThreshold,
+                'free_shipping_threshold' => $freeShippingConfig['threshold'],
+                'free_shipping_enabled' => $freeShippingConfig['enabled'],
                 'delivery_estimate' => $this->getDeliveryEstimate($zone),
                 'cod_available' => true,
                 'pickup_details' => $pickupDetails,
@@ -279,19 +283,45 @@ class ShippingService
     }
 
     /**
-     * Get free shipping threshold for a zone
+     * Get free shipping configuration for a zone
      */
-    protected function getFreeShippingThreshold($zone): float
+    protected function getFreeShippingConfig($zone): array
     {
-        $thresholds = [
+        // Try to get from database first (per-zone configuration)
+        $zoneConfig = \App\Models\ShippingZone::where('zone', $zone)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        // Default thresholds
+        $defaultThresholds = [
             'A' => 499,
             'B' => 699,
             'C' => 999,
             'D' => 1499,
             'E' => 2499
         ];
-        
-        return $thresholds[$zone] ?? 1499;
+
+        if ($zoneConfig) {
+            return [
+                'enabled' => (bool) $zoneConfig->free_shipping_enabled,
+                'threshold' => $zoneConfig->free_shipping_threshold ?? $defaultThresholds[$zone] ?? 1499
+            ];
+        }
+
+        // Fallback if no config found
+        return [
+            'enabled' => false,
+            'threshold' => $defaultThresholds[$zone] ?? 1499
+        ];
+    }
+
+    /**
+     * Get free shipping threshold for a zone (backward compatibility)
+     */
+    protected function getFreeShippingThreshold($zone): float
+    {
+        $config = $this->getFreeShippingConfig($zone);
+        return $config['threshold'];
     }
 
     /**

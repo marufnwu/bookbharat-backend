@@ -1,0 +1,458 @@
+Users
+POST User Token
+URL: https://shipment.xpressbees.com/api/users/login
+Use this API endpoint to generate authorization token.
+Parameters:
+Params Required Data Type Description/Example
+Email Yes string abc@mail.com
+Password Yes string 12376767
+HEADER
+content-type application/json
+Body raw
+{
+ "email”: "abc@gmail.com",
+ "password”: "12376767"
+}
+Shipments
+POST Create Shipment
+https://shipment.xpressbees.com/api/shipments2
+Use this API endpoint to generate AWB/tracking number for your order.
+Note: Order total is not automatically calculated in API request. Be sure to input the correct calculated order_amount.
+Parameters:
+Params Required Description Example
+order_number Yes string - max length: 20 1234
+payment_type Yes Valid Values - cod,
+prepaid & reverse
+Cod
+package_weight No Weight in grams 400
+package_length No Package length in cm. 12
+package_breadth No Package breadth in cm. 12
+package_height No Package height in cm. 12
+request_auto_pickup No Use Yes to send auto
+pickup request to
+courier.
+Yes
+shipping_charges No Shipping chages
+applied.
+40
+cod_charges No COD chages applied. 40
+Discount No Discount applied. 40
+order_amount Yes Total Order Amount. 999
+consignee[name] Yes String - max length: 200 Amit Kumar
+consignee[company_name] No String - max length: 200 ABC Company
+consignee[address] Yes String - max length: 200 Vipul Plaza
+consignee[address_2] No String - max length: 200 First Floor
+consignee[city] Yes String - max length: 40 Gurgaon
+consignee[state] Yes String - max length: 40 Haryana
+consignee[pincode] Yes 6 digit numeric 122003
+consignee[phone] Yes 10 digit numeric 9090909090
+pickup[warehouse_name] Yes String - max length: 20 Warehouse1
+pickup[name] Yes String - max length: 200 Amit Kumar
+pickup[address] Yes String - max length: 200 140, Abc
+pickup[address_2] No String - max length: 200 Near Metro Station
+pickup[city] Yes String - max length: 40 Gurgaon
+pickup[state] Yes String - max length: 40 Haryana
+pickup[pincode] Yes 6 digit numeric 122002
+pickup[phone] Yes 10 digit numeric 9999999999
+pickup[gst_umber] No 15 digit alpha numeric 18AABCU9603R1ZM
+is_rto_different No When Pickup & RTO
+address are different.
+If yes then rto[] array is
+required.
+Valid values - yes,no
+No
+rto[warehouse_name] Conditional String - max length: 20 Warehouse 1
+rto[name] Conditional String - max length: 200 Amit Kumar
+rto[address] Conditional String - max length: 200 140, ABC Road
+rto[address_2] Conditional String - max length: 200 Near Metro Station
+rto[city] Conditional String - max length: 40 Gurgaon
+rto[state] Conditional String - max length: 40 Haryana
+rto[pincode] Conditional 6 digit numeric
+122002
+rto[phone] Conditional 10 digit numeric 9999999999
+courier_id No numeric courier id 5
+collectable_amount Yes For Prepaid: Collectable
+amount should be zero.
+For cod: Collectable
+amount should be less
+than or equal to order
+amount.
+1500
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Body raw
+{
+ "order_number": "#001",
+ "shipping_charges": 40,
+ "discount": 100,
+ "cod_charges": 30,
+ "payment_type": "cod",
+ "order_amount": 1000,
+ "package_weight": 300,
+ "package_length": 10,
+ "package_breadth": 10,
+ "package_height": 10,
+ "request_auto_pickup" : "yes",
+ "consignee": {
+ "name": "Customer Name",
+ "address": "190, ABC Road",
+ "address_2": "Near Bus Stand",
+ "city": "Mumbai",
+ "state": "Maharastra",
+ "pincode": "400001",
+ "phone": "9999999999"
+ },
+ "pickup": {
+ "warehouse_name": "warehouse 1",
+ "name" : "Nitish Kumar",
+ "address": "140, MG Road",
+ "address_2": "Near metro station",
+ "city": "Gurgaon",
+ "state": "Haryana",
+ "pincode": "122001",
+ "phone": "9999999999"
+ },
+ "order_items": [
+ {
+ "name": "product 1",
+ "qty": "18",
+ "price": "100",
+ "sku": "sku001"
+ }
+ ],
+ "courier_id" : "1",
+ "collectable_amount":"1500"
+}
+Response
+Successful
+{
+ "status": true,
+ "data": {
+ "order_id": 3351555,
+ "shipment_id": 1929242,
+ "awb_number": "59632220664",
+ "courier_id": "5",
+ "courier_name": "Xpressbees",
+ "status": "booked",
+ "additional_info": "BOM / TEC",
+ "payment_type": "cod",
+ "label": "https://xb-files.s3.amazonaws.com/labels/20210127140158-79.pdf"
+}
+Failed
+{
+ "status": false,
+ "message": "Consignee name is required\n"
+}
+GET Track Shipment
+https://shipment.xpressbees.com/api/shipments2/track/{AWB}
+Get the tracking history a particular shipment through this API by passing the Xpressbees AWB
+Number in the endpoint URL itself. Type Xpressbees shipment AWB Number in place of {awb}. No
+other body parameters are required.
+Parameters:
+Response Status Codes:
+Status code Status
+PP Pending Pickup
+IT In Transit
+EX Exception
+FD Out For Delivery
+DL Delivered
+RT RTO
+RT-IT RTO In Transit
+RT-DL RTO Delivered
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Response
+Successful
+{
+ "status": true,
+ "data": {
+ "id": "2482000",
+ "order_id": "4340000",
+ "order_number": "#JS5897",
+ "created": "2021-03-01",
+ "awb_number": "59650109492",
+ "rto_awb": "75312963180",
+ "courier_id": "1",
+ "warehouse_id": "21135",
+ "rto_warehouse_id": "21135",
+ "status": "rto",
+ "rto_status": "delivered",
+ "shipment_info": "DEL / VED",
+ "history": [
+ {
+ "status_code": "IT",
+ "location": "BAREJA EPU (NCX)",
+ "event_time": "2021-03-02 18:19",
+ "message": "SHIPMENT ARRIVED"
+ },
+ {
+ "status_code": "IT",
+ "location": "BAREJA EPU (NCX)",
+ "event_time": "2021-03-02 22:07",
+ "message": "SHIPMENT FURTHER CONNECTED"
+ },
+
+{
+ "status_code": "RT-IT",
+ "location": "AHMEDABAD (PMX)",
+ "event_time": "2021-03-08 07:21",
+ "message": "SHIPMENT OUT FOR DELIVERY"
+ },
+ {
+ "status_code": "RT-DL",
+ "location": "AHMEDABAD (PMX)",
+ "event_time": "2021-03-08 11:24",
+ "message": "SHIPMENT DELIVERED"
+ }
+ ]
+ }
+Failed
+{
+ "status": false,
+ "message": "Record not found"
+}
+POST Manifest
+https://shipment.xpressbees.com/api/shipments2/manifest
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Body row
+{
+ "awbs": [
+ "4152911775885",
+ "XBC0001789312"
+ ]
+}
+Response
+Successful
+{
+ "status": true,
+"data": https://xb-files.s3.amazonaws.com/manifest/202101271708221-91.pdf
+}
+Failed
+{
+ "status": false,
+ "message": "Record not found"
+}
+POST Cancel Shipment
+https://shipment.xpressbees.com/api/shipments2/cancel
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Body row
+{
+ "awb" : "59632218892"
+}
+Response
+Successful
+{
+ "status": true,
+ "message": "Shipment Cancelled"
+}
+Failed
+{
+ "status": false,
+ "message": " Unable to cancel"
+}
+Couriers
+GET Courier List
+https://shipment.xpressbees.com/api/courier
+Use this API endpoint to Get the list of available couriers for your account.
+No parameters are required.
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Response
+Successful
+{
+{
+ "status": true,
+ "data": [
+ {
+ "id": "14",
+ "name": "Xpressbees Surface"
+ }
+ ]
+}
+POST Rate & Serviceability
+https://shipment.xpressbees.com/api/courier/serviceability
+Use this API endpoint to Check serviceability and get Freight Charges between origin and
+destination pincodes.
+Parameters
+Params Required Description Example
+Origin Yes
+Pickup pincode / integer
+- length: 6
+123456
+Destination Yes Destination pincode /
+integer - length: 6
+123456
+Cod Yes Valid Values - cod,
+prepaid
+cod
+Order amount Yes for COD order Total Order Amount.
+999
+Weight No Weight in grams.
+Default: 500.
+400
+Length No Package length in cm.
+Default: 10
+12
+Breadth No Package breadth in cm.
+Default: 10.
+12
+Height No Package height in cm.
+Default: 10.
+12
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Body row
+{
+ "origin" : "122001",
+ "destination" : "122001",
+ "payment_type" : "cod",
+ "order_amount" : "999",
+ "weight" : "600",
+ "length" : "10",
+ "breadth" : "10",
+ "height" : "10"
+}
+Response
+Successful
+{
+ "status": true,
+ "data": [
+
+ {
+ "id": "3",
+ "name": "Xpressbees Air",
+ "freight_charges": 67.4,
+ "cod_charges": 41.3,
+ "total_charges": 108.7,
+ "min_weight": 500,
+ "chargeable_weight": 1000
+ }
+
+]
+}
+Failed
+{
+ "status": false,
+ "message": " The Origin field must be exactly 6 characters in length.\n
+"
+}
+NDR
+GET Ndr List
+https://shipment.xpressbees.com/api/ndr
+Use this API endpoint to Get the list of available couriers for your account.
+No parameters are required.
+AUTHORIZATION Bearer Token
+Token <token>
+PARAMS
+awb_number 1122335577
+ Comma separated AWB list to filter
+per_page 1
+ page number
+awb_number 50
+ maximum 250 records
+Response
+Successful
+{
+{
+ "status": true,
+ "data": [
+ {
+ "awb_number": "XBC0002111111",
+ "event_date": "2021-04-05",
+ "courier_remarks": "Customer Not Responding",
+ "total_attempts": "1"
+ },
+ {
+ "awb_number": "4152913111112",
+ "event_date": "2021-04-05",
+ "courier_remarks": "No customer response from IVR call",
+ "total_attempts": "2"
+ },
+ {
+ "awb_number": "59666111113",
+ "event_date": "2021-04-05",
+ "courier_remarks": "CONSIGNEE REFUSED TO ACCEPT",
+ "total_attempts": "1"
+ }
+ ]
+}
+Failed
+{
+ "status": false,
+ "message": "No record found"
+}
+POST Ndr List
+https://shipment.xpressbees.com/api/ndr/create
+Use this API endpoint to generate Take action against any AWB. Action against 100 AWBs are allowed in one request.
+Note: Action is allowed only when Exception is raised by courier company.
+Supported Action Types: re-attempt, change_address, change_phone
+Check sample request body for supported action_data for each action type.
+AUTHORIZATION Bearer Token
+Token <token>
+HEADER
+content-type application/json
+Body raw
+[
+ {
+ "awb" : "XB0002111111",
+ "action" : "re-attempt",
+ "action_data" : {
+ "re_attempt_date" : "2021-06-03"
+ }
+ },
+ {
+ "awb" : "XB0002111112",
+ "action" : "change_address",
+ "action_data" : {
+ "name" : "customer name here",
+ "address_1" : "Address 1 here",
+ "address_2" : "Address 2 here"
+ }
+ },
+ {
+ "awb" : "NMBC0002111113",
+ "action" : "change_phone",
+ "action_data" : {
+ "phone" : "99999999"
+ }
+ }
+]
+Response
+Successful
+{
+[
+ {
+ "status": true,
+ "awb": "XB0002111111",
+ "message": "NDR Submitted Successfully"
+ },
+ {
+ "status": false,
+ "awb": "XB0002111112",
+ "message": "No Courier Exception Available"
+ },
+ {
+ "status": false,
+ "awb": "XB0002111113",
+ "message": "Mobile number should be 10 digits long"
+ }
+]
+Failed
+{
+ "status": false,
+ "message": "No record found"
+}

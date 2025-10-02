@@ -18,8 +18,14 @@ use App\Http\Controllers\Admin\BundleDiscountController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\ReviewController;
 use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SystemFlexibilityController;
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\ProductAssociationController;
+use App\Http\Controllers\Admin\BundleDiscountRuleController;
+use App\Http\Controllers\Admin\BundleAnalyticsController;
+use App\Http\Controllers\Admin\HeroConfigController;
 
 /*
 |--------------------------------------------------------------------------
@@ -105,16 +111,18 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     // User Management
     Route::prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'index']);
+        Route::get('/export', [UserController::class, 'export']);
+        Route::post('/bulk-action', [UserController::class, 'bulkAction']);
         Route::get('/{user}', [UserController::class, 'show']);
         Route::put('/{user}', [UserController::class, 'update']);
+        Route::delete('/{user}', [UserController::class, 'destroy']);
         Route::post('/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+        Route::post('/{user}/impersonate', [UserController::class, 'impersonate']);
         Route::get('/{user}/orders', [UserController::class, 'getOrders']);
         Route::get('/{user}/addresses', [UserController::class, 'getAddresses']);
         Route::get('/{user}/analytics', [UserController::class, 'getAnalytics']);
         Route::post('/{user}/send-email', [UserController::class, 'sendEmail']);
-        Route::post('/bulk-action', [UserController::class, 'bulkAction']);
-        Route::get('/export', [UserController::class, 'export']);
     });
 
     // Coupon Management
@@ -202,6 +210,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         // Testing & Analytics
         Route::post('/test-calculation', [ShippingConfigController::class, 'testCalculation']);
         Route::get('/analytics', [ShippingConfigController::class, 'getAnalytics']);
+
+        // Free Shipping Thresholds
+        Route::get('/free-shipping-thresholds', [ShippingConfigController::class, 'getFreeShippingThresholds']);
+        Route::post('/free-shipping-thresholds', [ShippingConfigController::class, 'updateFreeShippingThreshold']);
     });
 
     // Delivery Options
@@ -366,5 +378,74 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/backup/restore', [SettingsController::class, 'restoreBackup']);
         Route::get('/logs', [SettingsController::class, 'getSystemLogs']);
         Route::get('/queue-status', [SettingsController::class, 'getQueueStatus']);
+
+        // System Flexibility & Advanced Control
+        Route::get('/feature-flags', [SystemFlexibilityController::class, 'getFeatureFlags']);
+        Route::put('/feature-flags', [SystemFlexibilityController::class, 'updateFeatureFlags']);
+        Route::get('/maintenance-mode', [SystemFlexibilityController::class, 'getMaintenanceMode']);
+        Route::post('/maintenance-mode', [SystemFlexibilityController::class, 'toggleMaintenanceMode']);
+        Route::get('/rate-limiting', [SystemFlexibilityController::class, 'getRateLimiting']);
+        Route::put('/rate-limiting', [SystemFlexibilityController::class, 'updateRateLimiting']);
+        Route::get('/modules', [SystemFlexibilityController::class, 'getModules']);
+        Route::post('/modules/{module}/toggle', [SystemFlexibilityController::class, 'toggleModule']);
+        Route::get('/presets', [SystemFlexibilityController::class, 'getPresets']);
+        Route::post('/presets/apply', [SystemFlexibilityController::class, 'applyPreset']);
+        Route::get('/ip-restrictions', [SystemFlexibilityController::class, 'getIpRestrictions']);
+        Route::put('/ip-restrictions', [SystemFlexibilityController::class, 'updateIpRestrictions']);
+        Route::get('/config/export', [SystemFlexibilityController::class, 'exportConfiguration']);
+        Route::post('/config/import', [SystemFlexibilityController::class, 'importConfiguration']);
+    });
+
+    // Product Associations Management (Frequently Bought Together)
+    Route::prefix('product-associations')->group(function () {
+        Route::get('/', [ProductAssociationController::class, 'index']);
+        Route::get('/statistics', [ProductAssociationController::class, 'statistics']);
+        Route::get('/product/{productId}', [ProductAssociationController::class, 'getProductAssociations']);
+        Route::get('/{id}', [ProductAssociationController::class, 'show']);
+        Route::post('/', [ProductAssociationController::class, 'store']);
+        Route::put('/{id}', [ProductAssociationController::class, 'update']);
+        Route::delete('/{id}', [ProductAssociationController::class, 'destroy']);
+        Route::post('/bulk-delete', [ProductAssociationController::class, 'bulkDestroy']);
+        Route::post('/generate', [ProductAssociationController::class, 'generateAssociations']);
+        Route::delete('/clear-all', [ProductAssociationController::class, 'clearAllAssociations']);
+    });
+
+    // Bundle Discount Rules Management
+    Route::prefix('bundle-discount-rules')->group(function () {
+        Route::get('/', [BundleDiscountRuleController::class, 'index']);
+        Route::get('/statistics', [BundleDiscountRuleController::class, 'statistics']);
+        Route::get('/categories', [BundleDiscountRuleController::class, 'getCategories']);
+        Route::get('/customer-tiers', [BundleDiscountRuleController::class, 'getCustomerTiers']);
+        Route::get('/{id}', [BundleDiscountRuleController::class, 'show']);
+        Route::post('/', [BundleDiscountRuleController::class, 'store']);
+        Route::put('/{id}', [BundleDiscountRuleController::class, 'update']);
+        Route::delete('/{id}', [BundleDiscountRuleController::class, 'destroy']);
+        Route::post('/{id}/toggle-active', [BundleDiscountRuleController::class, 'toggleActive']);
+        Route::post('/{id}/test', [BundleDiscountRuleController::class, 'testRule']);
+        Route::post('/{id}/duplicate', [BundleDiscountRuleController::class, 'duplicate']);
+    });
+
+    // Bundle Analytics & Performance
+    Route::prefix('bundle-analytics')->group(function () {
+        Route::get('/', [BundleAnalyticsController::class, 'index']);
+        Route::get('/statistics', [BundleAnalyticsController::class, 'statistics']);
+        Route::get('/top-bundles', [BundleAnalyticsController::class, 'topBundles']);
+        Route::get('/performance', [BundleAnalyticsController::class, 'performance']);
+        Route::get('/funnel', [BundleAnalyticsController::class, 'funnel']);
+        Route::get('/product/{productId}/participation', [BundleAnalyticsController::class, 'productParticipation']);
+        Route::get('/export', [BundleAnalyticsController::class, 'export']);
+        Route::post('/compare', [BundleAnalyticsController::class, 'compare']);
+        Route::delete('/clear', [BundleAnalyticsController::class, 'clear']);
+    });
+
+    // Hero Configuration Management
+    Route::prefix('hero-config')->group(function () {
+        Route::get('/', [HeroConfigController::class, 'index']);
+        Route::get('/active', [HeroConfigController::class, 'getActive']);
+        Route::get('/{variant}', [HeroConfigController::class, 'show']);
+        Route::post('/', [HeroConfigController::class, 'store']);
+        Route::put('/{variant}', [HeroConfigController::class, 'update']);
+        Route::delete('/{variant}', [HeroConfigController::class, 'destroy']);
+        Route::post('/set-active', [HeroConfigController::class, 'setActive']);
     });
 });

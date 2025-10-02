@@ -156,6 +156,16 @@ class Product extends Model
         return $this->hasMany(ProductReturn::class);
     }
 
+    public function productAssociations(): HasMany
+    {
+        return $this->hasMany(ProductAssociation::class, 'product_id');
+    }
+
+    public function associatedWith(): HasMany
+    {
+        return $this->hasMany(ProductAssociation::class, 'associated_product_id');
+    }
+
     // Scopes
     public function scopeActive($query)
     {

@@ -1,0 +1,2285 @@
+API Documentation
+
+
+Authentication:
+Generate API-key from RapidShyp Portal to use it further to validate your API calls.
+
+Path:
+
+Setting>API>Configure
+
+
+
+Generate your API-key:
+
+Save the new API-key generated and use
+
+
+
+Pincode Serviceability API:
+Use this API to get pincode serviceability on the RapidShyp platform.
+
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/serviceabilty_check
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+Curl:
+curl --location 'https://api.rapidshyp.com/rapidshyp/apis/v1/serviceabilty_check' \
+--header 'rapidshyp-token: e779a4*************8b60ba5f09ecd579fa1f34b64805e' \--header 'Content-Type: application/json' \
+--data '{
+"Pickup_pincode": "110068",
+"Delivery_pincode": "110038",
+"cod": true,
+"total_order_value": 2000,
+"weight": 1
+}'
+
+
+
+Request Parameters
+Data type
+
+
+         Remark
+Validation
+
+
+
+
+
+
+
+
+
+
+Pickup_pincode
+
+
+Mandatory
+Postcode from where the order will be picked.
+6 digit pincode
+Delivery_pincode
+
+
+Mandatory
+Postcode where the order will be delivered
+6 digit pincode
+cod
+
+
+Mandatory
+True incase of cod order and false incase of prepaid order
+
+
+total_order_value
+
+
+Mandatory
+The price of the order shipment in rupees.
+
+
+weight
+
+
+Mandatory
+The weight of shipment in kgs.
+
+
+
+Response:
+{
+  "status": true,
+  "remark": "Success",
+  "serviceable_courier_list": [
+    {
+      "courier_code": "6001",
+      "courier_name": "BlueDart Express",
+      "parent_courier_name": "BlueDart",
+      "cutoff_time": "14:00",
+      "freight_mode": "Surface",
+      "max_weight": 5000.0,
+      "min_weight": 1.0,
+      "total_freight": 11.111
+    }
+  ]
+}
+
+
+Forward Wrapper API:
+
+Use this API to do multiple tasks in one go, namely creating a quick order, requesting its shipment, and finally generating the label and the manifest for the same order.
+
+This API integrates several other APIs to perform all these tasks together.
+
+Task:
+Create order
+Create shipment
+Run serviceability
+Check courier rule/priority
+Assign awb
+Generate pickup manifest
+Generate label pdf
+Generate invoice pdf
+Generate Manifest pdf
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+Curl:
+curl --location 'https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper' \
+--header 'rapidshyp-token: HQ$f**********oZ \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "orderId": "Tango34",
+    "orderDate": "2023-06-30",
+    "pickupAddressName": "Home",
+    "pickupLocation": {
+        "contactName": "Mahesh Mehra",
+        "pickupName": "New Seller 110001",
+        "pickupEmail": "mahesh.mehra@rapidshyp.com",
+        "pickupPhone": "8094723198",
+        "pickupAddress1": "New Delhi Seller",
+        "pickupAddress2": "New Delhi 2 Seller",
+        "pinCode": "110001"
+    },
+    "storeName": "DEFAULT",
+    "billingIsShipping": true,
+    "shippingAddress": {
+        "firstName": "Mahesh Mehra",
+        "lastName": "EXT",
+        "addressLine1": "Delhi",
+        "addressLine2": "New Delhi",
+        "pinCode": "110001",
+        "email": "mahesh.mehra@rapidshyp.com",
+        "phone": "8094723198"
+    },
+    "billingAddress": {
+        "firstName": "Jane",
+        "lastName": "Doe",
+        "addressLine1": "456 Elm St",
+        "addressLine2": "Apt 101",
+        "pinCode": "110001",
+        "email": "jane.doe@example.com",
+        "phone": "9876543211"
+    },
+    "orderItems": [
+        {
+            "itemName": "Product 1",
+            "sku": "SKU123",
+            "description": "Description of product 1",
+            "units": 5,
+            "unitPrice": 10.0,
+            "tax": 0.0,
+            "hsn": "HSN123",
+            "productLength": 10.0,
+            "productBreadth": 5.0,
+            "productHeight": 2.0,
+            "productWeight": 0.5,
+            "brand": "Brand A",
+            "imageURL": "http://example.com/product1.jpg",
+            "isFragile": false,
+            "isPersonalisable": false
+        },
+        {
+            "itemName": "Product 2",
+            "sku": "SKU456",
+            "description": "Description of product 2",
+            "units": 2,
+            "unitPrice": 20.0,
+            "tax": 0.0,
+            "hsn": "HSN456",
+            "productLength": 15.0,
+            "productBreadth": 7.0,
+            "productHeight": 3.0,
+            "productWeight": 0.8,
+            "brand": "Brand B",
+            "imageURL": "http://example.com/product2.jpg",
+            "isFragile": true,
+            "isPersonalisable": true
+        }
+    ],
+    "paymentMethod": "COD",
+    "shippingCharges": 100.0,
+    "giftWrapCharges": 0.0,
+    "transactionCharges": 0.0,
+    "totalDiscount": 0.0,
+    "totalOrderValue": 500.0,
+    "codCharges": 0.0,
+    "prepaidAmount": 0.0,
+    "packageDetails": {
+        "packageLength": 20.0,
+        "packageBreadth": 10.0,
+        "packageHeight": 5.0,
+        "packageWeight": 2000.0
+    }
+}'
+
+
+
+
+
+
+Request Parameters
+Requried
+         Remark
+Validation
+{
+
+
+
+
+
+
+orderId
+Mandatory
+Seller order ID on channel/store/website
+Minimum 1 character
+orderDate
+Mandatory
+Order created date on channel/store/website
+Format: YYYY-MM-DD
+pickupAddressName
+Conditionally-Mandatory
+Pickup name created on Rapidshyp platform
+API User can either pass pickup name or create pickup.If both details are shared,system will create order on the pickup name provided and will not create a new pickup location.
+pickupLocation
+Conditionally-Mandatory
+Create Pickup location on order creation itself
+{
+
+
+
+
+
+
+contactName
+Mandatory
+Location contact POC name
+Minimum 1 character
+pickupName
+Mandatory
+Name of the warehouse/store
+Pickup address name must be between 3 and 75 characters long
+pickupEmail
+Mandatory
+Location contact POC email
+
+
+pickupPhone
+Mandatory
+Location contact POC phone number
+Phone number must start from 6,7,8,9
+pickupAddress1
+Mandatory
+Warehouse/store address line 1
+Pickup address line 1 must be between 3 and 100 characters long
+pickupAddress2
+Non-Mandatory
+Warehouse/store address line 2
+if entered,Pickup address line 2 must be between 3 and 100 characters long
+pinCode
+Mandatory
+Location Pincode
+Must be 6 digit valid pincode
+},
+
+
+
+
+
+
+storeName
+Mandatory
+Store name created on Rapidshyp
+If you have one custom channel,pass "DEFAULT"
+billingIsShipping
+Mandatory
+
+
+Pass true if both shipping and billing is same.Incase false, Billing address can't be empty
+shippingAddress
+Mandatory
+
+
+
+
+{
+
+
+
+
+
+
+firstName
+Mandatory
+Customer first name
+The combined length of the first and last name in the shipping address must be between 3 and 75 characters.
+lastName
+Non-Mandatory
+Customer last name
+addressLine1
+Mandatory
+Customer Address line 1
+Shipping address line 1 must be between 3 and 100 characters long.
+addressLine2
+Non-Mandatory
+Customer Address line 2
+if entered,Shipping address line 2 must be between 3 and 100 characters long.
+pinCode
+Mandatory
+Customer address pincode
+Must be 6 digit valid pincode
+email
+Non-Mandatory
+Customer email
+
+
+phone
+Mandatory
+Customer phone number
+Phone number must start from 6,7,8,9
+},
+
+
+
+
+
+
+billingAddress
+Conditionally-Mandatory
+
+
+Only pass incase billingIsShipping: false,
+{
+
+
+
+
+
+
+firstName
+Mandatory
+Billing customer first name
+The combined length of the first and last name in the shipping address must be between 3 and 75 characters.
+lastName
+Non-Mandatory
+Billing customer last name
+addressLine1
+Mandatory
+Billing customer Address line 1
+Billing address line 1 must be between 3 and 100 characters long.
+addressLine2
+Non-Mandatory
+Billing customer Address line 2
+if entered,Billing address line 2 must be between 3 and 100 characters long.
+pinCode
+Mandatory
+Billing customer Address Pincode
+Must be 6 digit valid pincode
+email
+Mandatory
+Billing customer email
+
+
+phone
+Mandatory
+Billing customer phone number
+Phone number must start from 6,7,8,9
+},
+
+
+
+
+
+
+orderItems
+Mandatory
+item level details
+
+
+{
+
+
+
+
+
+
+itemName
+Mandatory
+Item Name
+Order line item name must be between 3 and 200 characters long.
+sku
+Non-Mandatory
+Item SKU Id
+Order line item sku must be between 3 and 200 characters long.
+description
+Non-Mandatory
+Description of product
+Minimum 1 character
+units
+Mandatory
+quantity of items
+Item quantity must be greater than 0 in items.
+unitPrice
+Mandatory
+Unit price of SKU
+Item unit price must be greater than 0 in items.
+tax
+Mandatory
+Tax
+Pass 0 incase of zero tax item
+hsn
+Non-Mandatory
+HSN code
+
+
+productLength
+Non-Mandatory
+Product dimension length
+in cm
+productBreadth
+Non-Mandatory
+Product dimension breadth
+in cm
+productHeight
+Non-Mandatory
+Product dimension height
+in cm
+productWeight
+Non-Mandatory
+Product dimension Weight
+in kg
+brand
+Non-Mandatory
+Brand of product
+
+
+imageURL
+Non-Mandatory
+Image URL
+
+
+isFragile
+Non-Mandatory
+
+
+if fragile item,pass true
+isPersonalisable
+Non-Mandatory
+
+
+if personlisable,pass true
+},
+
+
+
+
+
+
+],
+
+
+
+
+
+
+paymentMethod
+Mandatory
+Payment mode of order
+payment mode please choose from [COD, PREPAID]
+shippingCharges
+Non-Mandatory
+Shipping charges
+
+
+giftWrapCharges
+Non-Mandatory
+giftWrapCharges
+
+
+transactionCharges
+Non-Mandatory
+transactionCharges
+
+
+totalDiscount
+Non-Mandatory
+totalDiscount
+
+
+totalOrderValue
+Mandatory
+totalOrderValue
+
+
+codCharges
+Non-Mandatory
+codCharges
+
+
+prepaidAmount
+Non-Mandatory
+prepaidAmount
+Pass partially paid amount in case of partial paid order.System then calculates collectable amount.Prepaid amount is only applicable on COD payment mode.
+packageDetails
+Mandatory
+
+
+
+
+{
+
+
+
+
+
+
+packageLength
+Mandatory
+packageLength
+in cm
+packageBreadth
+Mandatory
+packageBreadth
+in cm
+packageHeight
+Mandatory
+packageHeight
+in cm
+packageWeight
+Mandatory
+packageWeight
+in kg
+}
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Response:
+
+
+{
+    "status": "SUCCESS",
+    "remarks": "",
+    "orderId": "T9",
+    "orderCreated": true,
+    "shipment": [
+        {
+            "shipmentId": "S24073186",
+            "awbGenerated": true,
+            "labelGenerated": true,
+            "pickupScheduled": true,
+            "awb": "71*******146",
+            "courierCode": "Ecom Express Surface",
+            "courierName": "Ecom Express Surface",
+            "parentCourierName": "Ecom Express",
+            "appliedWeight": 63.0,
+            "labelURL": "https://rapidshyp_labels/Label_10Jul24.pdf",
+            "manifestURL": "https://rapidshyp-public.s3.ap-south-1.amazonawsanifest_52.pdf",
+            "routingCode": "NOI",
+            "rtoRoutingCode": "NOI",
+            "pickupName": "Home",
+            "paymentMethod": "COD",
+            "shippingCharges": 100.0,
+            "giftWrapCharges": 0.0,
+            "transactionCharges": 0.0,
+            "totalDiscount": 0.0,
+            "totalOrderValue": 150.0,
+            "prepaidAmount": 0.0,
+            "collectableAmount": 150.0,
+            "shipmentLines": [
+                {
+                    "name": "Pwerew",
+                    "sku": "Sqwer",
+                    "units": 1,
+                    "sellingPrice": 10.0
+                },
+                {
+                    "name": "Product 2",
+                    "sku": "Product 2",
+                    "units": 2,
+                    "sellingPrice": 40.0
+                }
+            ]
+        }
+    ]
+}
+
+
+
+Forward Create Order API:
+
+Use this API to create an order on RapidShyp platform.
+
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/create_order
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+Request Curl:
+curl --location 'https://api.rapidshyp.com/rapidshyp/apis/v1/create_order' \
+--header 'rapidshyp-token: e779a465**********************1f34b64805e' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+"orderId": "EXTI_28",
+"orderDate": "2024-08-08",
+"pickupAddressName": "Seller 201301",
+"pickupLocation": {
+"contactName": "",
+"pickupName": "",
+"pickupEmail": "",
+"pickupPhone": "",
+"pickupAddress1": "",
+"pickupAddress2": "",
+"pinCode": ""
+},
+"storeName": "DEFAULT",
+"billingIsShipping": true,
+"shippingAddress": {
+"firstName": "Mahesh Mehra",
+"lastName": "EXT",
+"addressLine1": "Delhi",
+"addressLine2": "New Delhi",
+"pinCode": "110002",
+"email": "mahesh.mehra@rapidshyp.com",
+"phone": "8094723198"
+},
+"billingAddress": {
+"firstName": "Jane",
+"lastName": "Doegghgh",
+"addressLine1": "456 Elm St",
+"addressLine2": "Apt 101",
+"pinCode": "110002",
+"email": "jane.doe@example.com",
+"phone": "9876543211"
+},
+"orderItems": [
+{
+"itemName": "Product 2",
+"sku": "TEST14",
+"description": "Description of product 1",
+"units": 1,
+"unitPrice": 10.0,
+"tax": 0.0,
+"hsn": "HSN123",
+"productLength": 10.0,
+"productBreadth": 5.0,
+"productHeight": 2.0,
+"productWeight": 0.5,
+"brand": "Brand A",
+"imageURL": "https://file0%C3%97426.jpeg",
+"isFragile": false,
+"isPersonalisable": false,
+"pickupAddressName" :""
+},
+{
+"itemName": "Product 3",
+"sku": "TEST18",
+"description": "Description of product 2",
+"units": 2,
+"unitPrice": 20.0,
+"tax": 0.0,
+"hsn": "HSN456",
+"productLength": 15.0,
+"productBreadth": 7.0,
+"productHeight": 3.0,
+"productWeight": 0.8,
+"brand": "Brand B",
+"imageURL": "https://png.pngtdscape-jpg-wallpapers-free-download-image_2573540.jpg",
+"isFragile": false,
+"isPersonalisable": false,
+"pickupAddressName" :""
+}
+],
+"paymentMethod": "PREPAID",
+"shippingCharges": 100.0,
+"giftWrapCharges": 10.0,
+"transactionCharges": 20.0,
+"totalDiscount": 5.0,
+"codCharges": 20.0,
+"prepaidAmount": 50.0,
+"packageDetails": {
+"packageLength": 20.0,
+"packageBreadth": 10.0,
+"packageHeight": 5.0,
+"packageWeight": 2000.0
+}
+}'
+
+
+
+
+Request Parameters
+Required
+         Remark
+Validation
+{
+
+
+
+
+
+
+orderId
+Mandatory
+Seller order ID on channel/store/website
+Minimum 1 character
+orderDate
+Mandatory
+Order created date on channel/store/website
+Format: YYYY-MM-DD
+pickupAddressName
+Conditionally-Mandatory
+Pickup name created on Rapidshyp platform
+API User can either pass pickup name or create pickup.If both details are shared,system will create order on the pickup name provided and will not create a new pickup location.
+pickupLocation
+Conditionally-Mandatory
+Create Pickup location on order creation itself
+{
+
+
+
+
+
+
+contactName
+Mandatory
+Location contact POC name
+Minimum 1 character
+pickupName
+Mandatory
+Name of the warehouse/store
+Pickup address name must be between 3 and 75 characters long
+pickupEmail
+Mandatory
+Location contact POC email
+
+
+pickupPhone
+Mandatory
+Location contact POC phone number
+Phone number must start from 6,7,8,9
+pickupAddress1
+Mandatory
+Warehouse/store address line 1
+Pickup address line 1 must be between 3 and 100 characters long
+pickupAddress2
+Non-Mandatory
+Warehouse/store address line 2
+if entered,Pickup address line 2 must be between 3 and 100 characters long
+pinCode
+Mandatory
+Location Pincode
+Must be 6 digit valid pincode
+},
+
+
+
+
+
+
+storeName
+Mandatory
+Store name created on Rapidshyp
+If you have one custom channel,pass "DEFAULT"
+billingIsShipping
+Mandatory
+
+
+Pass true if both shipping and billing is same.Incase false, Billing address can't be empty
+shippingAddress
+Mandatory
+
+
+
+
+{
+
+
+
+
+
+
+firstName
+Mandatory
+Customer first name
+The combined length of the first and last name in the shipping address must be between 3 and 75 characters.
+lastName
+Non-Mandatory
+Customer last name
+addressLine1
+Mandatory
+Customer Address line 1
+Shipping address line 1 must be between 3 and 100 characters long.
+addressLine2
+Non-Mandatory
+Customer Address line 2
+if entered,Shipping address line 2 must be between 3 and 100 characters long.
+pinCode
+Mandatory
+Customer address pincode
+Must be 6 digit valid pincode
+email
+Non-Mandatory
+Customer email
+
+
+phone
+Mandatory
+Customer phone number
+Phone number must start from 6,7,8,9
+},
+
+
+
+
+
+
+billingAddress
+Conditionally-Mandatory
+
+
+Only pass incase billingIsShipping: false,
+{
+
+
+
+
+
+
+firstName
+Mandatory
+Billing customer first name
+The combined length of the first and last name in the shipping address must be between 3 and 75 characters.
+lastName
+Non-Mandatory
+Billing customer last name
+addressLine1
+Mandatory
+Billing customer Address line 1
+Billing address line 1 must be between 3 and 100 characters long.
+addressLine2
+Non-Mandatory
+Billing customer Address line 2
+if entered,Billing address line 2 must be between 3 and 100 characters long.
+pinCode
+Mandatory
+Billing customer Address Pincode
+Must be 6 digit valid pincode
+email
+Mandatory
+Billing customer email
+
+
+phone
+Mandatory
+Billing customer phone number
+Phone number must start from 6,7,8,9
+},
+
+
+
+
+
+
+orderItems
+Mandatory
+item level details
+
+
+{
+
+
+
+
+
+
+itemName
+Mandatory
+Item Name
+Order line item name must be between 3 and 200 characters long.
+sku
+Non-Mandatory
+Item SKU Id
+Order line item sku must be between 3 and 200 characters long.
+description
+Non-Mandatory
+Description of product
+Minimum 1 character
+units
+Mandatory
+quantity of items
+Item quantity must be greater than 0 in items.
+unitPrice
+Mandatory
+Unit price of SKU
+Item unit price must be greater than 0 in items.
+tax
+Mandatory
+Tax
+Pass 0 incase of zero tax item
+hsn
+Non-Mandatory
+HSN code
+
+
+productLength
+Non-Mandatory
+Product dimension length
+in cm
+productBreadth
+Non-Mandatory
+Product dimension breadth
+in cm
+productHeight
+Non-Mandatory
+Product dimension height
+in cm
+productWeight
+Non-Mandatory
+Product dimension Weight
+in kg
+brand
+Non-Mandatory
+Brand of product
+
+
+imageURL
+Non-Mandatory
+Image URL
+
+
+isFragile
+Non-Mandatory
+
+
+if fragile item,pass true
+isPersonalisable
+Non-Mandatory
+
+
+if personlisable,pass true
+pickupAddressName
+Non-Mandatory
+
+
+Define pickup location at item level to create multi-shipment for an order
+
+
+},
+
+
+
+
+
+
+],
+
+
+
+
+
+
+paymentMethod
+Mandatory
+Payment mode of order
+payment mode please choose from [COD, PREPAID]
+shippingCharges
+Non-Mandatory
+Shipping charges
+
+
+giftWrapCharges
+Non-Mandatory
+giftWrapCharges
+
+
+transactionCharges
+Non-Mandatory
+transactionCharges
+
+
+totalDiscount
+Non-Mandatory
+totalDiscount
+
+
+totalOrderValue
+Mandatory
+totalOrderValue
+
+
+codCharges
+Non-Mandatory
+codCharges
+
+
+prepaidAmount
+Non-Mandatory
+prepaidAmount
+Pass partially paid amount in case of partial paid order.System then calculates collectable amount.Prepaid amount is only applicable on COD payment mode.
+packageDetails
+Mandatory
+
+
+
+
+{
+
+
+
+
+
+
+packageLength
+Mandatory
+packageLength
+in cm
+packageBreadth
+Mandatory
+packageBreadth
+in cm
+packageHeight
+Mandatory
+packageHeight
+in cm
+packageWeight
+Mandatory
+packageWeight
+in kg
+}
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+In the create order API you can use existing pickup location/create a pickup location/define pickup location on items.
+
+Pickup location logic in request payload:
+Users can either enter pickup location on an order or on item level.
+If a user enters a pickup location on an order level,he can either use the existing pickup location or create a pickup location on order level.
+Incase he creates pickup on order level, new pickup location will be created in system and the rto address will be same as the pickup location created
+Users can only enter the pickup location name on item level. System won't provide pickup location creation on item level.
+If Users define pickup location on item level, the system will create orders with multiple shipment assigned to location provided in item line.
+Forward Update Order API:
+
+Use this API to update an order on the RapidShyp platform.
+
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/create_order
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+Request Curl:
+curl --location 'https://apI.rapidshyp.com/rapidshyp/apis/v1/order_update' \
+--header 'rapidshyp-token: 9d49051367d217bde6e5b03e55e36b01627d262fe59aa7c4c4296c49cde40517' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "orderId": "EXT_0066",
+    "pickupAddressName": "AbhinavvvvvVVVVVvvvV",
+    "store_name": "DEFAULT",
+    "shippingAddress": {
+        "firstName": "ABGH",
+        "lastName": "",
+        "addressLine1": "WEww",
+        "addressLine2": "DDDDDD",
+        "pinCode": "250221",
+        "email": "avdhesh.bharwaj@rapidshyp.com",
+        "phone": "8094723433"
+    },
+    "billingAddress": {
+        "firstName": "aDFGG",
+        "lastName": "",
+        "addressLine1": "sfdD",
+        "addressLine2": "Apt 10",
+        "pinCode": "110001",
+        "email": "jane.doee@xample.com",
+        "phone": "9876543212"
+    },
+    "paymentMethod": "PREPAID",
+    "packageDetails": {
+        "packageLength": 0.0,
+        "packageBreadth": 0.0,
+        "packageHeight": 0.0,
+        "packageWeight": 0.0
+    }
+}'
+
+
+
+Request Parameters
+Required
+Remark
+Validation
+orderId
+Mandatory
+Seller order ID for which you want to make the updates
+Valid order created on Rapidshyp
+store_name
+Mandatory
+Store name of the order
+Format: YYYY-MM-DD
+pickupAddressName
+Conditionally-Mandatory
+Use the updated pickup location name to update the location if rquired
+Enter a valid location name fro Rapidshyp created pickup locations
+shippingAddress: {
+Conditionally-Mandatory
+
+
+
+
+firstName
+Mandatory
+Customer Firstname
+Minimum 3 character
+lastName
+Mandatory
+Customer lastname
+Minimum 3 character
+addressLine1
+Mandatory
+Customer address line 1
+Pickup address line 1 must be between 3 and 100 characters long
+addressLine2:
+Mandatory
+Customer address line 2
+if entered,Pickup address line 2 must be between 3 and 100 characters long
+pinCode:
+Mandatory
+Location Pincode
+Must be 6 digit valid pincode
+email:
+Non-Mandatory
+Customer Email
+vaild email id
+phone:
+Mandatory
+Customer Phone number
+Must be 10-digit valid phone number
+},
+
+
+
+
+
+
+billingAddress: {
+
+
+
+
+
+
+firstName
+Mandatory
+Customer Billing Firstname
+Minimum 3 character
+lastName
+Mandatory
+Customer Billing lastname
+Minimum 3 character
+addressLine1
+Mandatory
+Customer Billing address line 1
+Pickup address line 1 must be between 3 and 100 characters long
+addressLine2
+Mandatory
+Customer Billing address line 2
+if entered,Pickup address line 2 must be between 3 and 100 characters long
+pinCode
+Mandatory
+Billing Location Pincode
+Must be 6 digit valid pincode
+email
+Non-Mandatory
+Billing Customer Email
+vaild email id
+phone
+Mandatory
+Billing Customer Phone number
+Must be 10-digit valid phone number
+},
+
+
+
+
+
+
+paymentMethod
+Conditionally-Mandatory
+Use this to change COD order to Prepaid orders
+COD/PREPAID allowed
+packageDetails: {
+Conditionally-Mandatory
+
+
+
+
+packageLength
+Mandatory
+packageLength
+in cm
+packageBreadth
+Mandatory
+packageBreadth
+in cm
+packageHeight
+Mandatory
+packageHeight
+in cm
+packageWeight
+Mandatory
+packageWeight
+in kg
+}
+
+
+
+
+
+
+}'
+
+
+
+
+
+
+
+
+Response:
+
+{
+  "status": "success",
+  "partial_update": true,
+  "not_updated_fields": "",
+  "remarks": "success",
+  "order_id": "EXT_0066",
+  "updated_shipment_details": [
+    {
+      "shipment_id": "S25016974",
+      "pickup_name": "third",
+      "payment_method": "PREPAID",
+      "shipping_charges": 10,
+      "giftwrap_charges": 11,
+      "transaction_charges": 12,
+      "total_discount": 70,
+      "total_value": 5473,
+      "collectable_amount": 0,
+      "prepaid_amount": 5473
+    }
+
+  ]
+}
+
+
+AWB Assignment API:
+Use this API to assign awb to order-shipment on the RapidShyp platform.
+
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://apI.rapidshyp.com/rapidshyp/apis/v1/assign_awb
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+Curl:
+curl --location 'https://apI.rapidshyp.com/rapidshyp/apis/v1/assign_awb' \
+--header 'rapidshyp-token: e779a4656395810c1f***************79fa1f34b64805e' \
+--header 'Content-Type: application/json' \
+--data '{
+"shipment_id":"S240927365",
+"courier_code":""
+}'
+
+
+
+Request Parameters
+
+
+         Remark
+Validation
+
+
+
+
+
+
+
+
+shipment_id
+Mandatory
+Order shipmentID on channel/store/website
+Should belong to a valid order
+courier_code
+non-Mandatory
+Order created date on channel/store/website
+The courier id of the courier service you want to select. The default courier(based on courier rule/priority) is selected in case no id is specified.You can get courier code calling serviceability API.
+
+
+Response:
+{
+    "status": "SUCCESS",
+    "remarks": "SUCCESS",
+    "shipment_id": "S240927365",
+    "order_id": "6203483586732",
+    "awb": "11111111111",
+    "courier_code": "6001",
+    "courier_name": "BlueDart Express",
+    "parent_courier_name": "BlueDart",
+    "applied_weight": 2433.399,
+    "rto_routing_code": "DEL/ANT/ANT",
+    "pickup_name": "meerut",
+    "payment_method": "PREPAID",
+    "total_order_value": 2357.64,
+    "collectable_amount": 0.0
+}
+
+Schedule Pickup API:
+Use this API to Schedule pickup for an awb of order-shipment on RapidShyp platform.
+
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://apI.rapidshyp.com/rapidshyp/apis/v1/schedule_pickup
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+Curl:
+curl --location 'https://apI.rapidshyp.com/rapidshyp/apis/v1/schedule_pickup' \
+--header 'rapidshyp-token: e779a4656*************1***************5f09ecd579fa1f34b64805e' \
+--header 'Content-Type: application/json' \
+--data '{
+"shipment_id":"S240927365",
+"awb":""
+}'
+
+
+
+Request Parameters
+
+
+         Remark
+Validation
+
+
+
+
+
+
+
+
+shipment_id
+Mandatory
+Order shipmentID on channel/store/website
+Should belong to a valid order.
+awb
+non-Mandatory
+Awb assigned to shipmentID
+AWB should belong to the shipment id shared.
+
+Response:
+{
+    "status": "SUCCESS",
+    "remarks": "SUCCESS",
+    "shipmentId": "S240927365",
+    "orderId": "6203483586732",
+    "awb": "11111111111",
+    "courierCode": "6001",
+    "courierName": "BlueDart Express",
+    "parentCourierName": "BlueDart",
+    "routingCode": "DEL/ANT/ANT",
+    "rtoRoutingCode": "DEL/ANT/ANT"
+}
+
+
+De-allocate Shipment API:
+
+Use this API to de-allocate awb from shipment order at Rapidshyp.You can re-call awb API again to generate fresh awb for the same shipment.
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/de_allocate_shipment
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+
+
+Curl:
+
+curl --location 'https://api.rapidshyp.com/rapidshyp/apis/v1/de_allocate_shipment' \
+--header 'rapidshyp-token: HQ$f**********oZ \
+--header 'Content-Type: application/json' \
+--data '{
+    "orderId": "Tango2",
+    "shipmentId": "S2407199"
+}'
+
+
+
+Request Parameters
+
+
+
+
+Validation
+{
+
+
+
+
+
+
+orderId
+Mandatory
+Order id created on Rapidshyp
+should be a valid order id
+shipmentId
+Mandatory
+Shipment id created on Rapidshyp
+should be a valid shipment id
+}
+
+
+
+
+
+
+
+
+
+Response:
+{
+    "status": true,
+    "remarks": "Shipment successfully de-allocated."
+}
+
+Cancel Order API:
+Usage:  Use this API to cancel a created order.
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/cancel_order
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+
+
+Curl:
+curl --location 'https://api.rapidshyp.com/api/rapidshyp/apis/v1/cancel_order' \
+--header 'rapidshyp-token: HQ$f**********oZ' \
+--header 'Content-Type: application/json' \
+--data '{
+    "orderId": "Tango2",
+    "storeName": "DEFAULT"
+}'
+
+
+
+
+Request Parameters
+
+
+Remark
+Validation
+{
+
+
+
+
+
+
+orderId
+Mandatory
+Order id created on Rapid Shyp
+should be a valid order id
+storeName
+Mandatory
+store name of order on Rapidshyp
+should be a valid store name id
+}
+
+
+
+
+
+
+
+
+
+Response:
+
+{
+    "status": true,
+    "remarks": "Order canceled successfully."
+}
+
+
+
+
+
+
+Label PDF Generation API:
+Use this API to generate Label PDF.
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/generate_label
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapid ship-token):
+ API-Key
+
+
+Curl:
+
+curl --location 'https://api.rapidshyp.com/rapidshyp/apis/v1/generate_label' \
+--header 'rapidshyp-token: HQ$fS*******KHoZ' \
+--header 'Content-Type: application/json' \
+--data '{
+    "shipmentId": ["S2407199"]
+}'
+
+
+
+Request Parameters
+
+
+
+
+Validation
+{
+
+
+
+
+
+
+shipmentId
+Mandatory
+Order id created on Rapid Shyp
+should be a valid order id
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+Response:
+{
+    "status": true,
+    "remarks": "Label(s) generated successfully.",
+    "labelData": [
+        {
+            "shipmentId": "S2407199",
+            "labelURL": "https://rapidshyp-public.s3.ap-south-1.amazona****************2:46PM.pdf",
+            "labelRemarks": "Label generated successfully."
+        }
+    ]
+}
+
+
+
+
+Create Pickup Location API:
+
+
+Use this API to Create Pickup Location at Rapidshyp.
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/create/pickup_location
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapid ship-token):
+ API-Key
+
+
+Curl:
+
+curl --location --globoff 'https://api.rapidshyp.com/rapidshyp/apis/v1/create/pickup_location' \
+--header 'rapidshyp-token: {{WR}}' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "address_name": "Warehouse1",
+    "contact_name": "Cristiano Ronaldo",
+    "contact_number": "7302907766",
+    "email": "john.doe@example.com",
+    "address_line": "123 Main St",
+    "address_line2": "Suite 100",
+    "pincode": "110001",
+    "gstin": "24AAACO4716C1ZZ",
+    "dropship_location": true,
+    "use_alt_rto_address": true,
+    "rto_address": "",
+    "create_rto_address": {
+        "rto_address_name": "Warehouse2",
+        "rto_contact_name": "Sergio Ramos",
+        "rto_contact_number": "7302808843",
+        "rto_email": "jane.smith@example.com",
+        "rto_address_line": "456 RTO Rd",
+        "rto_address_line2": "Building B",
+        "rto_pincode": "110001",
+        "rto_gstin": ""
+    }
+}'
+
+
+
+Request Parameters
+Required
+Remark
+Validation
+address_name
+Mandatory
+Define a name to the warehouse/store/pikup location
+Minimum 1 character
+contact_name
+Mandatory
+Warehouse manager name
+Only alphabets allowed
+contact_number
+Mandatory
+Contact number of the POC at warehouse
+Should start with 7,8,9 and should be 10 digit
+email
+Non-Mandatory
+Email of the POC at warehouse
+
+
+address_line
+Mandatory
+Warehouse/store address line 1
+Pickup address line 1 must be between 3 and 100 characters long
+address_line2
+Non-Mandatory
+Warehouse/store address line 1
+Pickup address line 1 must be between 3 and 100 characters long
+pincode
+Mandatory
+Location Pincode
+Must be 6 digit valid pincode
+gstin
+Non-Mandatory
+Location gstin if any
+Valid GSTIN number
+dropship_location
+Non-Mandatory
+Mark true if the location is a drop ship location
+Accepts boolean value
+use_alt_rto_address
+Mandatory
+Seller can map different rto location aganist a pickup location.Incase RTO location is same,mark this field as False
+Accepts boolean value
+rto_address
+Conditional-Mandatory
+Use to map already defined rto address against the pickup location
+
+
+create_rto_address
+Conditional-Mandatory
+
+
+
+
+{
+
+
+
+
+
+
+rto_address_name
+Mandatory
+Define a name to the warehouse/store/pikup location
+Minimum 1 character
+rto_contact_name
+Mandatory
+Warehouse manager name
+Only alphabets allowed
+rto_contact_number
+Mandatory
+Contact number of the POC at warehouse
+Should start with 7,8,9 and should be 10 digit
+rto_email
+Non-Mandatory
+Email of the POC at warehouse
+
+
+rto_address_line
+Mandatory
+Warehouse/store address line 1
+Shipping address line 1 must be between 3 and 100 characters long.
+rto_address_line2
+Non-Mandatory
+Warehouse/store address line 2
+if entered,Shipping address line 2 must be between 3 and 100 characters long.
+rto_pincode
+Mandatory
+Location Pincode
+Must be 6 digit valid pincode
+rto_gstin
+Non-Mandatory
+Location gstin if any
+Valid GSTIN number
+}
+
+
+
+
+
+
+
+
+
+
+Response:
+
+{
+    "status": "success",
+    "remark": "Address created successfully",
+    "pickup_location_name": "Warehouse1",
+    "rto_location_name": "Warehouse2"
+}
+
+
+
+
+Action NDR API:
+
+
+Use this API to take action on your pending NDR.
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/ndr/action
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapid ship-token):
+ API-Key
+
+
+Curl:
+
+curl --location 'https://api.rapidshyp.com/rapidshyp/apis/v1/ndr/action' \
+--header 'rapidshyp-token: eadb9ad30bb30393ca33e33cead7bf1ba6caef6e3bde19cc0855dcaa908e360e' \
+--header 'Content-Type: application/json' \
+--data '
+{
+"awb": "9002898078004",
+"action": "REATTEMPT",
+"phone": "7302870884",
+"address1": "AJJ",
+"address2": ""
+}'
+
+
+Request Parameters
+Required
+Remark
+Validation
+awb
+Mandatory
+AWB for which NDR has been raised by courier
+
+
+action
+Mandatory
+RE_ATTEMPT - pass re-attempt to reattempt the ndr
+RETURN: pass return to rto the shipment
+
+
+phone
+Conditional-Mandatory
+updated phone number
+Use this field incase of action “Re-attempt”
+address1
+Conditional-Mandatory
+updated address details
+Use this field incase of action “Re-attempt”
+address2
+Conditional-Mandatory
+updated address details
+Use this field incase of action “Re-attempt”
+
+
+Response:
+{
+"status": "SUCCESS",
+"remarks": "We have successfully process your NDR request"
+}
+
+Tracking:
+
+
+Use this API to fetch awb tracking.
+
+
+                                       Basic Information
+NAME
+DETAILS
+Usage:
+Mandatory
+URL:
+https://api.rapidshyp.com/rapidshyp/apis/v1/track_order
+Request Type:
+POST
+Scheme:
+HTTPS
+Header (content-type)
+application/json
+Header (rapidshyp-token):
+ API-Key
+
+
+Request Sample:
+
+
+{
+
+    			"seller_order_id": "O24025",
+
+    			"contact": "455432345 ",
+
+   			 "email": "mah@rapidshyp.com",
+
+   			 "awb": "RAPP0000000001"
+
+}
+
+
+
+Request Parameters
+
+
+
+
+Validation
+seller_order_id
+Conditional mandatory
+order id of order created on Rapidshyp
+Either order id is required or awb
+contact
+
+
+
+
+Api user to share any of these details in case tracking is fetched based on order id.
+email
+
+
+
+
+awb
+Conditional mandatory
+awb of shipment where awb is assigned on Rapidshyp
+Either order id is required or awb
+
+
+
+Response:
+
+{
+    "success": true,
+    "msg": "Record found successfully",
+    "records": [
+        {
+            "seller_order_id": "O2406211",
+            "creation_date": "11-06-2024 18:56:14",
+            "payment_method": "COD",
+            "total_order_value": 454.0,
+            "store_name": "DEFAULT",
+            "store_brand_name": "test Brand1",
+            "store_id": null,
+            "shipping_name": "JainAkans",
+            "shipping_email": "",
+            "shipping_contact": "919876543456",
+            "shipping_address": "sdfghfdsa",
+            "shipping_address_2": "sdfgbfdsa",
+            "shipping_city": "DELHI",
+            "shipping_pin_code": "110001",
+            "shipping_state": "DELHI",
+            "shipping_country": "INDIA",
+            "billing_name": "JainAkans",
+            "billing_email": "",
+            "billing_contact": "919876543456",
+            "billing_address": "sdfghfdsa",
+            "billing_address_2": "sdfgbfdsa",
+            "billing_city": "DELHI",
+            "billing_pin_code": "110001",
+            "billing_state": "DELHI",
+            "billing_country": "INDIA",
+            "customer_gstin": "",
+            "order_status": "PROCESSING",
+            "shipment_details": [
+                {
+                    "shipment_id": "S2406116",
+                    "shipment_creation_date": "11-06-2024 18:56:31",
+                    "total_shipment_value": 64.0,
+                    "collectable_amount": 64.0,
+                    "pickup_warehouse_name": "Delhi 110001",
+                    "warehouse_contact_name": "Akansha Jain",
+                    "warehouse_email": "abc@gmail.com",
+                    "warehouse_contact": "9885645678",
+                    "warehouse_address": "23456sdfvgbhfdcs",
+                    "warehouse_address_2": "sdfgh",
+                    "warehouse_pin_code": "110001",
+                    "warehouse_city": "DELHI",
+                    "warehouse_state": "DELHI",
+                    "warehouse_country": "INDIA",
+                    "rto_warehouse_name": "Delhi 110001",
+                    "rto_warehouse_contact_name": "Akansha Jain",
+                    "rto_warehouse_email": "abc@gmail.com",
+                    "rto_warehouse_contact": "9885645678",
+                    "rto_warehouse_address": "23456sdfvgbhfdcs",
+                    "rto_warehouse_address_2": "sdfgh",
+                    "rto_warehouse_pin_code": "110001",
+                    "rto_warehouse_city": "DELHI",
+                    "rto_warehouse_state": "DELHI",
+                    "rto_warehouse_country": "INDIA",
+                    "length": 11.0,
+                    "breadth": 12.0,
+                    "height": 13.0,
+                    "dead_weight": 1.0,
+                    "applied_weight": 1.0,
+                    "invoice_number": "",
+                    "shipment_status": "READY_TO_SHIP",
+                    "awb": "I99296844",
+                    "courier_name": "DTDC",
+                    "child_courier_name": "DTDC - Air - 500 Gm",
+                    "awb_assigned_date": "11-06-2024 18:57:10",
+                    "current_courier_edd": null,
+                    "current_tracking_status_code": null,
+                    "current_tracking_status_desc": null,
+                    "current_status_date": null,
+                    "latest_ndr_reason_code": null,
+                    "latest_ndr_reason_desc": null,
+                    "latest_ndr_date": null,
+                    "product_details": [
+                        {
+                            "product_name": "res",
+                            "product_sku": "678",
+                            "product_qty": 1
+                        }
+                    ],
+                    "track_scans": [],
+                    "delivered_date": null,
+                    "rto_delivered_date": null
+                },
+                {
+                    "shipment_id": "S2406115",
+                    "shipment_creation_date": "11-06-2024 18:56:30",
+                    "total_shipment_value": 390.0,
+                    "collectable_amount": 390.0,
+                    "pickup_warehouse_name": "Seller 110001",
+                    "warehouse_contact_name": "Sudeep Das Gupta",
+                    "warehouse_email": "sudeep.dasgupta@rapidshyp.com",
+                    "warehouse_contact": "9876543211",
+                    "warehouse_address": "Seller RE Plot 110001",
+                    "warehouse_address_2": "",
+                    "warehouse_pin_code": "110001",
+                    "warehouse_city": "DELHI",
+                    "warehouse_state": "DELHI",
+                    "warehouse_country": "INDIA",
+                    "rto_warehouse_name": "Seller 110001",
+                    "rto_warehouse_contact_name": "Sudeep Das Gupta",
+                    "rto_warehouse_email": "sudeep.dasgupta@rapidshyp.com",
+                    "rto_warehouse_contact": "9876543211",
+                    "rto_warehouse_address": "Seller RE Plot 110001",
+                    "rto_warehouse_address_2": "",
+                    "rto_warehouse_pin_code": "110001",
+                    "rto_warehouse_city": "DELHI",
+                    "rto_warehouse_state": "DELHI",
+                    "rto_warehouse_country": "INDIA",
+                    "length": 11.0,
+                    "breadth": 12.0,
+                    "height": 13.0,
+                    "dead_weight": 1.0,
+                    "applied_weight": 1.0,
+                    "invoice_number": "",
+                    "shipment_status": "READY_TO_SHIP",
+                    "awb": "I99296845",
+                    "courier_name": "DTDC",
+                    "child_courier_name": "DTDC - Air - 500 Gm",
+                    "awb_assigned_date": "11-06-2024 18:56:44",
+                    "current_courier_edd": null,
+                    "current_tracking_status_code": null,
+                    "current_tracking_status_desc": null,
+                    "current_status_date": null,
+                    "latest_ndr_reason_code": null,
+                    "latest_ndr_reason_desc": null,
+                    "latest_ndr_date": null,
+                    "product_details": [
+                        {
+                            "product_name": "bag",
+                            "product_sku": "546",
+                            "product_qty": 1
+                        },
+                        {
+                            "product_name": "teA",
+                            "product_sku": "434",
+                            "product_qty": 1
+                        }
+                    ],
+                    "track_scans": null,
+                    "delivered_date": null,
+                    "rto_delivered_date": null
+                }
+            ]
+        }
+    ]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tracking status code Rapidshyp:
+
+Rapishyp Tracking Status Code
+Status Description
+SCB
+Shipment Booked
+PSH
+Pickup Scheduled
+OFP
+Out for Pickup
+PUE
+Pick up Exception
+PCN
+Pickup Cancelled
+PUC
+Pickup Completed
+SPD
+Shipped/Dispatched
+INT
+In Transit
+RAD
+Reached at Destination
+DED
+Delivery Delayed
+OFD
+Out for Delivery
+DEL
+Delivered
+UND
+Undelivered
+RTO_REQ
+RTO Requested
+RTO
+RTO Confirmed
+RTO_INT
+RTO In Transit
+RTO_RAD
+RTO - Reached at Destination
+RTO_OFD
+RTO Out for Delivery
+RTO_DEL
+RTO Delivered
+RTO_UND
+RTO Undelivered
+CAN
+Shipment Cancelled
+ONH
+Shipment On Hold
+LST
+Shipment Lost
+DMG
+Shipment Damaged
+MSR
+Shipment Misrouted
+DPO
+Shipment Disposed-Off
+
+
+
+
+
+

@@ -11,17 +11,23 @@ use App\Models\PersistentCart;
 use App\Models\Coupon;
 use App\Jobs\SendAbandonedCartEmail;
 use Illuminate\Support\Str;
-use AppServicesProductRecommendationService;
+use App\Services\ProductRecommendationService;
+use App\Services\ShippingService;
 
 class CartService
 {
     protected PricingEngine $pricingEngine;
     protected ProductRecommendationService $recommendationService;
-    
-    public function __construct(PricingEngine $pricingEngine, ProductRecommendationService $recommendationService)
-    {
+    protected ShippingService $shippingService;
+
+    public function __construct(
+        PricingEngine $pricingEngine,
+        ProductRecommendationService $recommendationService,
+        ShippingService $shippingService
+    ) {
         $this->pricingEngine = $pricingEngine;
         $this->recommendationService = $recommendationService;
+        $this->shippingService = $shippingService;
     }
 
     public function addToCart($productId, $variantId = null, $quantity = 1, $attributes = [], $userId = null, $sessionId = null)
@@ -193,11 +199,11 @@ class CartService
         return null;
     }
     
-    public function getCartSummary($userId = null, $sessionId = null)
+    public function getCartSummary($userId = null, $sessionId = null, $deliveryPincode = null, $pickupPincode = null)
     {
         $cart = $this->getCart($userId, $sessionId);
-        
-        if (!$cart || !$cart->items) {
+
+        if (!$cart || !$cart->items || $cart->items->isEmpty()) {
             return [
                 'total_items' => 0,
                 'subtotal' => 0,
@@ -205,23 +211,25 @@ class CartService
                 'shipping_cost' => 0,
                 'total' => 0,
                 'currency' => 'INR',
-                'is_empty' => true
+                'is_empty' => true,
+                'requires_pincode' => true,
+                'shipping_details' => null
             ];
         }
-        
+
         // Calculate basic subtotal
         $subtotal = $cart->items->sum(function($item) {
             return $item->unit_price * $item->quantity;
         });
-        
+
         $totalItems = $cart->items->sum('quantity');
         $couponDiscount = $cart->coupon_discount ?? 0;
         $couponFreeShipping = $cart->coupon_free_shipping ?? false;
-        
+
         // Check for bundle discounts
         $bundleDiscount = 0;
         $bundleDetails = null;
-        
+
         if ($cart->items->count() >= 2) {
             try {
                 // Get products from cart items
@@ -230,13 +238,13 @@ class CartService
                     $product->cart_quantity = $item->quantity;
                     return $product;
                 });
-                
+
                 // Calculate potential bundle discount using recommendation service
                 $bundleData = $this->recommendationService->calculateBundlePrice(
-                    $products->first(), 
+                    $products->first(),
                     $products->slice(1)
                 );
-                
+
                 if ($bundleData && $bundleData['savings'] > 0) {
                     $bundleDiscount = $bundleData['savings'];
                     $bundleDetails = [
@@ -253,37 +261,113 @@ class CartService
                 \Log::warning('Bundle discount calculation failed', ['error' => $e->getMessage()]);
             }
         }
-        
+
         // Apply all discounts (coupon + bundle, but bundle shouldn't stack with coupon typically)
         $totalDiscount = max($couponDiscount, $bundleDiscount); // Use better of the two
         $discountedSubtotal = max(0, $subtotal - $totalDiscount);
-        
+
+        // Calculate tax on discounted subtotal (before shipping)
         $taxAmount = $discountedSubtotal * 0.18; // 18% GST
-        $shippingCost = ($discountedSubtotal > 500 || $couponFreeShipping) ? 0 : 50;
+
+        // Calculate REAL shipping using ShippingService
+        $shippingCost = 0;
+        $shippingDetails = null;
+        $requiresPincode = !$deliveryPincode;
+
+        if ($deliveryPincode && !$couponFreeShipping) {
+            try {
+                // Get default pickup pincode if not provided
+                if (!$pickupPincode) {
+                    $pickupPincode = $this->getDefaultPickupPincode();
+                }
+
+                // Prepare items for shipping calculation
+                $shippingItems = $cart->items->map(function($item) {
+                    $product = $item->product;
+                    return [
+                        'product' => (object) [
+                            'weight' => $product->weight ?? 0.5, // Default 0.5kg if not set
+                            'dimensions' => [
+                                'length' => $product->length ?? 20,
+                                'width' => $product->width ?? 14,
+                                'height' => $product->height ?? 5
+                            ]
+                        ],
+                        'quantity' => $item->quantity
+                    ];
+                })->toArray();
+
+                // Calculate real shipping using ShippingService
+                $shippingCalculation = $this->shippingService->calculateShippingCharges(
+                    $pickupPincode,
+                    $deliveryPincode,
+                    $shippingItems,
+                    $discountedSubtotal // Order value for free shipping check
+                );
+
+                // Get cheapest shipping option
+                $cheapestOption = collect($shippingCalculation['shipping_options'])
+                    ->sortBy('final_cost')
+                    ->first();
+
+                $shippingCost = $cheapestOption['final_cost'];
+                $shippingDetails = [
+                    'zone' => $shippingCalculation['zone'],
+                    'zone_name' => $shippingCalculation['zone_name'],
+                    'free_shipping_threshold' => $shippingCalculation['free_shipping_threshold'],
+                    'free_shipping_enabled' => $shippingCalculation['free_shipping_enabled'],
+                    'is_free_shipping' => $cheapestOption['is_free_shipping'],
+                    'billable_weight' => $shippingCalculation['billable_weight'],
+                    'delivery_estimate' => $shippingCalculation['delivery_estimate']
+                ];
+
+            } catch (\Exception $e) {
+                // Log error but don't break cart functionality
+                \Log::error('Shipping calculation failed in cart', [
+                    'error' => $e->getMessage(),
+                    'pickup' => $pickupPincode,
+                    'delivery' => $deliveryPincode
+                ]);
+                // Fallback to flat rate
+                $shippingCost = 50;
+                $requiresPincode = true;
+            }
+        } else if ($couponFreeShipping) {
+            $shippingCost = 0;
+            $shippingDetails = [
+                'is_free_shipping' => true,
+                'reason' => 'Coupon provides free shipping'
+            ];
+        }
+
+        // Calculate final total
         $total = $discountedSubtotal + $taxAmount + $shippingCost;
-        
+
         $summary = [
             'total_items' => $totalItems,
-            'subtotal' => $subtotal,
+            'subtotal' => round($subtotal, 2),
             'coupon_code' => $cart->coupon_code,
-            'coupon_discount' => $couponDiscount,
+            'coupon_discount' => round($couponDiscount, 2),
             'coupon_free_shipping' => $couponFreeShipping,
-            'bundle_discount' => $bundleDiscount,
+            'bundle_discount' => round($bundleDiscount, 2),
             'bundle_details' => $bundleDetails,
-            'total_discount' => $totalDiscount,
-            'discounted_subtotal' => $discountedSubtotal,
-            'tax_amount' => $taxAmount,
-            'shipping_cost' => $shippingCost,
-            'total' => $total,
+            'total_discount' => round($totalDiscount, 2),
+            'discounted_subtotal' => round($discountedSubtotal, 2),
+            'tax_amount' => round($taxAmount, 2),
+            'shipping_cost' => round($shippingCost, 2),
+            'shipping_details' => $shippingDetails,
+            'total' => round($total, 2),
             'currency' => 'INR',
-            'is_empty' => false
+            'is_empty' => false,
+            'requires_pincode' => $requiresPincode,
+            'pincode_message' => $requiresPincode ? 'Enter delivery pincode to calculate shipping' : null
         ];
-        
+
         // Add bundle savings message if applicable
         if ($bundleDiscount > 0) {
             $summary['discount_message'] = "Bundle discount applied! You saved ₹" . number_format($bundleDiscount, 2);
         }
-        
+
         return $summary;
     }    
     public function mergeGuestCart($guestSessionId, User $user)
@@ -428,12 +512,28 @@ class CartService
     
     protected function calculateShipping($cart, $totalWeight)
     {
-        // Basic shipping calculation - integrate with shipping service
-        if ($cart->subtotal >= 500) {
-            return 0; // Free shipping
+        // This method is deprecated - use getCartSummary with pincode instead
+        \Log::warning('Deprecated calculateShipping method called - use getCartSummary with pincode');
+        return 50; // Fallback flat rate
+    }
+
+    protected function getDefaultPickupPincode(): string
+    {
+        // Try to get default warehouse pincode
+        try {
+            $defaultWarehouse = \App\Models\InventoryLocation::where('is_default', true)
+                ->where('is_active', true)
+                ->first();
+
+            if ($defaultWarehouse && $defaultWarehouse->postal_code) {
+                return $defaultWarehouse->postal_code;
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Failed to get default warehouse pincode', ['error' => $e->getMessage()]);
         }
-        
-        return 50; // Flat shipping rate
+
+        // Fallback to Delhi
+        return '110001';
     }
     
     protected function calculateTax($subtotal, $cart)

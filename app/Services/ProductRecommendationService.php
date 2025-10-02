@@ -323,9 +323,22 @@ class ProductRecommendationService
         sort($productIds);
         $bundleId = 'bundle_' . implode('_', $productIds);
 
-        DB::table('bundle_analytics')
-            ->where('bundle_id', $bundleId)
-            ->increment('views');
+        try {
+            DB::table('bundle_analytics')->updateOrInsert(
+                ['bundle_id' => $bundleId],
+                [
+                    'product_ids' => json_encode($productIds),
+                    'views' => DB::raw('COALESCE(views, 0) + 1'),
+                    'updated_at' => now(),
+                    'created_at' => DB::raw('COALESCE(created_at, NOW())')
+                ]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Failed to track bundle view', [
+                'bundle_id' => $bundleId,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     /**
@@ -336,9 +349,56 @@ class ProductRecommendationService
         sort($productIds);
         $bundleId = 'bundle_' . implode('_', $productIds);
 
-        DB::table('bundle_analytics')
-            ->where('bundle_id', $bundleId)
-            ->increment('add_to_cart');
+        try {
+            DB::table('bundle_analytics')->updateOrInsert(
+                ['bundle_id' => $bundleId],
+                [
+                    'product_ids' => json_encode($productIds),
+                    'add_to_cart' => DB::raw('COALESCE(add_to_cart, 0) + 1'),
+                    'updated_at' => now(),
+                    'created_at' => DB::raw('COALESCE(created_at, NOW())')
+                ]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Failed to track bundle add to cart', [
+                'bundle_id' => $bundleId,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Track bundle purchase
+     */
+    public function trackBundlePurchase($productIds, $revenue = 0)
+    {
+        sort($productIds);
+        $bundleId = 'bundle_' . implode('_', $productIds);
+
+        try {
+            DB::table('bundle_analytics')->updateOrInsert(
+                ['bundle_id' => $bundleId],
+                [
+                    'product_ids' => json_encode($productIds),
+                    'purchases' => DB::raw('COALESCE(purchases, 0) + 1'),
+                    'total_revenue' => DB::raw('COALESCE(total_revenue, 0) + ' . $revenue),
+                    'conversion_rate' => DB::raw('
+                        CASE
+                            WHEN COALESCE(views, 0) > 0
+                            THEN (COALESCE(purchases, 0) + 1) / COALESCE(views, 0) * 100
+                            ELSE 0
+                        END
+                    '),
+                    'updated_at' => now(),
+                    'created_at' => DB::raw('COALESCE(created_at, NOW())')
+                ]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Failed to track bundle purchase', [
+                'bundle_id' => $bundleId,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     /**

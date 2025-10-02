@@ -20,22 +20,27 @@ class CartController extends Controller
         $this->cartService = $cartService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
         // Check for authentication using Sanctum
-        $user = request()->user();
+        $user = $request->user();
         $userId = $user ? $user->id : null;
-        $sessionId = request()->header('X-Session-ID');
+        $sessionId = $request->header('X-Session-ID');
 
         \Log::info('CartController::index called', [
-            'userId' => $userId, 
+            'userId' => $userId,
             'sessionId' => $sessionId,
             'auth_check' => $user !== null,
             'auth_user' => $user?->id
         ]);
 
         $cart = $this->cartService->getCart($userId, $sessionId);
-        $cartSummary = $this->cartService->getCartSummary($userId, $sessionId);
+
+        // Get delivery pincode from query parameter if provided
+        $deliveryPincode = $request->query('delivery_pincode');
+        $pickupPincode = $request->query('pickup_pincode');
+
+        $cartSummary = $this->cartService->getCartSummary($userId, $sessionId, $deliveryPincode, $pickupPincode);
 
         return response()->json([
             'success' => true,
@@ -205,6 +210,48 @@ class CartController extends Controller
         }
     }
 
+    /**
+     * Calculate shipping for cart based on delivery pincode
+     */
+    public function calculateShipping(Request $request)
+    {
+        $request->validate([
+            'delivery_pincode' => 'required|string|size:6',
+            'pickup_pincode' => 'nullable|string|size:6'
+        ]);
+
+        try {
+            $user = $request->user();
+            $userId = $user ? $user->id : null;
+            $sessionId = $request->header('X-Session-ID');
+
+            // Recalculate cart summary with shipping
+            $cartSummary = $this->cartService->getCartSummary(
+                $userId,
+                $sessionId,
+                $request->delivery_pincode,
+                $request->pickup_pincode
+            );
+
+            return response()->json([
+                'success' => true,
+                'summary' => $cartSummary,
+                'message' => 'Shipping calculated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to calculate shipping', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to calculate shipping: ' . $e->getMessage()
+            ], 400);
+        }
+    }
+
     public function getAvailableCoupons()
     {
         try {
@@ -232,6 +279,105 @@ class CartController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Add a bundle of products to cart with discount
+     */
+    public function addBundle(Request $request)
+    {
+        $request->validate([
+            'main_product_id' => 'required|exists:products,id',
+            'product_ids' => 'required|array|min:1',
+            'product_ids.*' => 'exists:products,id',
+            'bundle_discount_rule_id' => 'nullable|exists:bundle_discount_rules,id'
+        ]);
+
+        try {
+            $user = $request->user();
+            $userId = $user ? $user->id : null;
+            $sessionId = $request->header('X-Session-ID');
+
+            \DB::beginTransaction();
+
+            // Generate unique bundle ID
+            $bundleId = 'bundle_' . time() . '_' . uniqid();
+            $allProductIds = array_merge([$request->main_product_id], $request->product_ids);
+
+            // Load all products
+            $products = Product::whereIn('id', $allProductIds)
+                ->where('status', 'active')
+                ->where('in_stock', true)
+                ->get();
+
+            if ($products->count() !== count($allProductIds)) {
+                throw new \Exception('Some products are not available');
+            }
+
+            // Calculate bundle discount
+            $recommendationService = app(\App\Services\ProductRecommendationService::class);
+            $mainProduct = $products->firstWhere('id', $request->main_product_id);
+            $additionalProducts = $products->whereNotIn('id', [$request->main_product_id]);
+
+            $bundleData = $recommendationService->calculateBundlePrice($mainProduct, $additionalProducts);
+            $discountPercentage = $bundleData['discount_percentage'];
+
+            // Add each product to cart with bundle metadata
+            $cartItems = [];
+            foreach ($products as $product) {
+                // Calculate discounted price for this item
+                $originalPrice = $product->price;
+                $discountAmount = $originalPrice * ($discountPercentage / 100);
+                $discountedPrice = $originalPrice - $discountAmount;
+
+                // Add to cart with bundle metadata
+                $cartItem = $this->cartService->addToCart(
+                    $product->id,
+                    null, // variant_id
+                    1, // quantity
+                    [
+                        'bundle_id' => $bundleId,
+                        'bundle_discount_rule_id' => $request->bundle_discount_rule_id,
+                        'bundle_discount_percentage' => $discountPercentage,
+                        'original_price' => $originalPrice,
+                        'bundle_discount_amount' => $discountAmount,
+                        'is_bundle_item' => true
+                    ],
+                    $userId,
+                    $sessionId
+                );
+
+                $cartItems[] = $cartItem;
+            }
+
+            // Track bundle add to cart
+            $recommendationService->trackBundleAddToCart($allProductIds);
+
+            \DB::commit();
+
+            $cartSummary = $this->cartService->getCartSummary($userId, $sessionId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Bundle added to cart successfully',
+                'bundle_id' => $bundleId,
+                'cart_items' => $cartItems,
+                'bundle_data' => $bundleData,
+                'cart_summary' => $cartSummary
+            ]);
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            \Log::error('Failed to add bundle to cart', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add bundle to cart: ' . $e->getMessage()
+            ], 400);
         }
     }
 }

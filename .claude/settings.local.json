@@ -18,7 +18,9 @@
       "Bash(netstat:*)",
       "Read(//d/bookbharat-v2/.claude/**)",
       "Bash(lsof:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(awk:*)",
+      "Read(//d/bookbharat-v2/**)"
     ],
     "deny": [],
     "ask": []

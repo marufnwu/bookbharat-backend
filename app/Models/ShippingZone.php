@@ -17,6 +17,8 @@ class ShippingZone extends Model
         'aw_rate',
         'cod_charges',
         'cod_percentage',
+        'free_shipping_threshold',
+        'free_shipping_enabled',
     ];
 
     /**
@@ -25,11 +27,13 @@ class ShippingZone extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'fwd_rate'       => 'float',
-        'rto_rate'       => 'float',
-        'aw_rate'        => 'float',
-        'cod_charges'    => 'float',
-        'cod_percentage' => 'float',
+        'fwd_rate'                => 'float',
+        'rto_rate'                => 'float',
+        'aw_rate'                 => 'float',
+        'cod_charges'             => 'float',
+        'cod_percentage'          => 'float',
+        'free_shipping_threshold' => 'float',
+        'free_shipping_enabled'   => 'boolean',
     ];
 
     /**

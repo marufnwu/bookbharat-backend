@@ -526,4 +526,519 @@ class SettingsController extends Controller
             'settings' => $settings
         ]);
     }
+
+    // ==================== System Management ====================
+
+    public function systemHealth()
+    {
+        try {
+            $health = [
+                'database' => $this->checkDatabaseConnection(),
+                'cache' => $this->checkCacheConnection(),
+                'storage' => $this->checkStorageAccess(),
+                'queue' => $this->checkQueueStatus(),
+                'memory_usage' => memory_get_usage(true),
+                'memory_limit' => ini_get('memory_limit'),
+                'php_version' => PHP_VERSION,
+                'laravel_version' => app()->version(),
+                'server_time' => now()->toDateTimeString(),
+                'timezone' => config('app.timezone'),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'health' => $health,
+                'overall_status' => $this->determineOverallStatus($health)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check system health',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function checkDatabaseConnection()
+    {
+        try {
+            \DB::connection()->getPdo();
+            return [
+                'status' => 'connected',
+                'database' => \DB::connection()->getDatabaseName(),
+                'driver' => config('database.default')
+            ];
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+
+    private function checkCacheConnection()
+    {
+        try {
+            Cache::put('health_check', true, 10);
+            $result = Cache::get('health_check');
+            return [
+                'status' => $result ? 'active' : 'error',
+                'driver' => config('cache.default')
+            ];
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+
+    private function checkStorageAccess()
+    {
+        try {
+            $disk = \Storage::disk('public');
+            return [
+                'status' => $disk->exists('') ? 'accessible' : 'error',
+                'driver' => config('filesystems.default')
+            ];
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+
+    private function checkQueueStatus()
+    {
+        try {
+            return [
+                'status' => 'active',
+                'driver' => config('queue.default'),
+                'jobs_pending' => \DB::table('jobs')->count(),
+                'jobs_failed' => \DB::table('failed_jobs')->count(),
+            ];
+        } catch (\Exception $e) {
+            return ['status' => 'unknown', 'message' => $e->getMessage()];
+        }
+    }
+
+    private function determineOverallStatus($health)
+    {
+        if ($health['database']['status'] !== 'connected') return 'critical';
+        if ($health['cache']['status'] !== 'active') return 'warning';
+        if ($health['storage']['status'] !== 'accessible') return 'warning';
+        return 'healthy';
+    }
+
+    public function clearCache()
+    {
+        try {
+            \Artisan::call('cache:clear');
+            \Artisan::call('config:clear');
+            \Artisan::call('route:clear');
+            \Artisan::call('view:clear');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'All caches cleared successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear cache',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function optimize()
+    {
+        try {
+            \Artisan::call('optimize');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Application optimized successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to optimize application',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getBackups()
+    {
+        // Placeholder - would need actual backup implementation
+        $backups = [
+            [
+                'id' => 1,
+                'filename' => 'backup_2025_09_30_database.sql',
+                'type' => 'database',
+                'size' => '45.2 MB',
+                'created_at' => now()->subDays(1)->toDateTimeString(),
+            ],
+            [
+                'id' => 2,
+                'filename' => 'backup_2025_09_29_full.zip',
+                'type' => 'full',
+                'size' => '120.5 MB',
+                'created_at' => now()->subDays(2)->toDateTimeString(),
+            ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'backups' => $backups,
+            'message' => 'Backup functionality coming soon'
+        ]);
+    }
+
+    public function createBackup(Request $request)
+    {
+        $request->validate([
+            'type' => 'required|in:database,files,full'
+        ]);
+
+        // Placeholder - would need actual backup implementation
+        return response()->json([
+            'success' => true,
+            'message' => 'Backup creation functionality coming soon',
+            'type' => $request->type
+        ]);
+    }
+
+    public function restoreBackup(Request $request)
+    {
+        $request->validate([
+            'backup_id' => 'required|integer'
+        ]);
+
+        // Placeholder - would need actual restore implementation
+        return response()->json([
+            'success' => true,
+            'message' => 'Backup restore functionality coming soon',
+            'backup_id' => $request->backup_id
+        ]);
+    }
+
+    public function getSystemLogs(Request $request)
+    {
+        try {
+            $logPath = storage_path('logs/laravel.log');
+
+            if (!file_exists($logPath)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Log file not found'
+                ], 404);
+            }
+
+            $lines = $request->input('lines', 100);
+            $content = $this->tailLog($logPath, $lines);
+
+            return response()->json([
+                'success' => true,
+                'logs' => $content,
+                'file' => 'laravel.log',
+                'lines' => $lines
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to read logs',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function tailLog($file, $lines = 100)
+    {
+        $handle = fopen($file, "r");
+        $linecounter = $lines;
+        $pos = -2;
+        $beginning = false;
+        $text = [];
+
+        while ($linecounter > 0) {
+            $t = " ";
+            while ($t != "\n") {
+                if (fseek($handle, $pos, SEEK_END) == -1) {
+                    $beginning = true;
+                    break;
+                }
+                $t = fgetc($handle);
+                $pos--;
+            }
+            $linecounter--;
+            if ($beginning) {
+                rewind($handle);
+            }
+            $text[$lines - $linecounter - 1] = fgets($handle);
+            if ($beginning) break;
+        }
+        fclose($handle);
+        return array_reverse($text);
+    }
+
+    public function getQueueStatus()
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'queue' => [
+                    'driver' => config('queue.default'),
+                    'jobs_pending' => \DB::table('jobs')->count(),
+                    'jobs_failed' => \DB::table('failed_jobs')->count(),
+                    'recent_failures' => \DB::table('failed_jobs')
+                        ->orderBy('failed_at', 'desc')
+                        ->limit(5)
+                        ->get()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get queue status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ==================== Email & SMS Settings ====================
+
+    public function getEmail()
+    {
+        return response()->json([
+            'success' => true,
+            'settings' => [
+                'mail_driver' => AdminSetting::get('mail_driver', config('mail.default')),
+                'mail_host' => AdminSetting::get('mail_host', config('mail.mailers.smtp.host')),
+                'mail_port' => AdminSetting::get('mail_port', config('mail.mailers.smtp.port')),
+                'mail_username' => AdminSetting::get('mail_username', config('mail.mailers.smtp.username')),
+                'mail_encryption' => AdminSetting::get('mail_encryption', config('mail.mailers.smtp.encryption')),
+                'mail_from_address' => AdminSetting::get('mail_from_address', config('mail.from.address')),
+                'mail_from_name' => AdminSetting::get('mail_from_name', config('mail.from.name')),
+            ]
+        ]);
+    }
+
+    public function updateEmail(Request $request)
+    {
+        $request->validate([
+            'mail_host' => 'required|string',
+            'mail_port' => 'required|integer',
+            'mail_username' => 'required|string',
+            'mail_password' => 'nullable|string',
+            'mail_encryption' => 'nullable|in:tls,ssl',
+            'mail_from_address' => 'required|email',
+            'mail_from_name' => 'required|string',
+        ]);
+
+        try {
+            AdminSetting::set('mail_driver', 'smtp');
+            AdminSetting::set('mail_host', $request->mail_host);
+            AdminSetting::set('mail_port', $request->mail_port);
+            AdminSetting::set('mail_username', $request->mail_username);
+            if ($request->filled('mail_password')) {
+                AdminSetting::set('mail_password', encrypt($request->mail_password));
+            }
+            AdminSetting::set('mail_encryption', $request->mail_encryption ?? 'tls');
+            AdminSetting::set('mail_from_address', $request->mail_from_address);
+            AdminSetting::set('mail_from_name', $request->mail_from_name);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Email settings updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update email settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getSms()
+    {
+        return response()->json([
+            'success' => true,
+            'settings' => [
+                'sms_provider' => AdminSetting::get('sms_provider', 'twilio'),
+                'sms_api_key' => AdminSetting::get('sms_api_key', ''),
+                'sms_api_secret' => AdminSetting::get('sms_api_secret', ''),
+                'sms_from_number' => AdminSetting::get('sms_from_number', ''),
+                'sms_enabled' => AdminSetting::get('sms_enabled', false),
+            ]
+        ]);
+    }
+
+    public function updateSms(Request $request)
+    {
+        $request->validate([
+            'sms_provider' => 'required|in:twilio,nexmo,sns',
+            'sms_api_key' => 'required|string',
+            'sms_api_secret' => 'required|string',
+            'sms_from_number' => 'required|string',
+            'sms_enabled' => 'boolean',
+        ]);
+
+        try {
+            AdminSetting::set('sms_provider', $request->sms_provider);
+            AdminSetting::set('sms_api_key', $request->sms_api_key);
+            AdminSetting::set('sms_api_secret', encrypt($request->sms_api_secret));
+            AdminSetting::set('sms_from_number', $request->sms_from_number);
+            AdminSetting::set('sms_enabled', $request->input('sms_enabled', false));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'SMS settings updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update SMS settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ==================== Tax Management ====================
+
+    public function getTaxes()
+    {
+        return response()->json([
+            'success' => true,
+            'settings' => [
+                'tax_enabled' => AdminSetting::get('tax_enabled', true),
+                'tax_rate' => AdminSetting::get('tax_rate', 18), // GST 18%
+                'tax_name' => AdminSetting::get('tax_name', 'GST'),
+                'tax_calculation_method' => AdminSetting::get('tax_calculation_method', 'inclusive'),
+                'tax_classes' => [
+                    ['id' => 1, 'name' => 'Standard', 'rate' => 18],
+                    ['id' => 2, 'name' => 'Reduced', 'rate' => 5],
+                    ['id' => 3, 'name' => 'Zero Rated', 'rate' => 0],
+                ]
+            ]
+        ]);
+    }
+
+    public function updateTaxes(Request $request)
+    {
+        $request->validate([
+            'tax_enabled' => 'boolean',
+            'tax_rate' => 'required|numeric|min:0|max:100',
+            'tax_name' => 'required|string|max:50',
+            'tax_calculation_method' => 'required|in:inclusive,exclusive',
+        ]);
+
+        try {
+            AdminSetting::set('tax_enabled', $request->input('tax_enabled', true));
+            AdminSetting::set('tax_rate', $request->tax_rate);
+            AdminSetting::set('tax_name', $request->tax_name);
+            AdminSetting::set('tax_calculation_method', $request->tax_calculation_method);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tax settings updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update tax settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ==================== Currency Management ====================
+
+    public function getCurrencies()
+    {
+        return response()->json([
+            'success' => true,
+            'settings' => [
+                'default_currency' => AdminSetting::get('default_currency', 'INR'),
+                'supported_currencies' => AdminSetting::get('supported_currencies', ['INR', 'USD', 'EUR']),
+                'currency_symbol' => AdminSetting::get('currency_symbol', '₹'),
+                'currency_position' => AdminSetting::get('currency_position', 'left'),
+                'available_currencies' => [
+                    ['code' => 'INR', 'name' => 'Indian Rupee', 'symbol' => '₹'],
+                    ['code' => 'USD', 'name' => 'US Dollar', 'symbol' => '$'],
+                    ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€'],
+                    ['code' => 'GBP', 'name' => 'British Pound', 'symbol' => '£'],
+                ]
+            ]
+        ]);
+    }
+
+    public function updateCurrencies(Request $request)
+    {
+        $request->validate([
+            'default_currency' => 'required|string|size:3',
+            'supported_currencies' => 'required|array',
+            'currency_symbol' => 'required|string|max:5',
+            'currency_position' => 'required|in:left,right',
+        ]);
+
+        try {
+            AdminSetting::set('default_currency', $request->default_currency);
+            AdminSetting::set('supported_currencies', $request->supported_currencies);
+            AdminSetting::set('currency_symbol', $request->currency_symbol);
+            AdminSetting::set('currency_position', $request->currency_position);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Currency settings updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update currency settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ==================== Activity Logs ====================
+
+    public function getActivityLogs(Request $request)
+    {
+        try {
+            $query = \Spatie\Activitylog\Models\Activity::with('causer', 'subject')
+                ->orderBy('created_at', 'desc');
+
+            if ($request->filled('causer_id')) {
+                $query->where('causer_id', $request->causer_id);
+            }
+
+            if ($request->filled('subject_type')) {
+                $query->where('subject_type', $request->subject_type);
+            }
+
+            if ($request->filled('event')) {
+                $query->where('event', $request->event);
+            }
+
+            if ($request->filled('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->filled('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
+            $logs = $query->paginate($request->input('per_page', 50));
+
+            return response()->json([
+                'success' => true,
+                'logs' => $logs,
+                'stats' => [
+                    'total_activities' => \Spatie\Activitylog\Models\Activity::count(),
+                    'today_activities' => \Spatie\Activitylog\Models\Activity::whereDate('created_at', today())->count(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve activity logs',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -129,25 +129,25 @@ Route::prefix('v1')->group(function () {
         Route::get('/{id}', [FaqController::class, 'show']);
     });
 
-    // Hero Configuration Routes
+    // Hero Configuration Routes (Read-only for public)
     Route::prefix('hero')->group(function () {
         Route::get('/', [App\Http\Controllers\Api\HeroConfigController::class, 'index']);
         Route::get('/active', [App\Http\Controllers\Api\HeroConfigController::class, 'getActive']);
         Route::get('/{variant}', [App\Http\Controllers\Api\HeroConfigController::class, 'show']);
-        Route::post('/set-active', [App\Http\Controllers\Api\HeroConfigController::class, 'setActive']);
-        Route::put('/{variant}', [App\Http\Controllers\Api\HeroConfigController::class, 'update']);
     });
 
     // Cart Routes (Public - supports both guest and authenticated users)
     Route::prefix('cart')->group(function () {
         Route::get('/', [CartController::class, 'index']);
         Route::post('/add', [CartController::class, 'add']);
+        Route::post('/add-bundle', [CartController::class, 'addBundle']);
         Route::put('/update/{cartItem}', [CartController::class, 'update']);
         Route::delete('/remove/{cartItem}', [CartController::class, 'destroy']);
         Route::delete('/clear', [CartController::class, 'clear']);
         Route::post('/apply-coupon', [CartController::class, 'applyCoupon']);
         Route::delete('/remove-coupon', [CartController::class, 'removeCoupon']);
         Route::get('/validate', [CartController::class, 'validateCart']);
+        Route::post('/calculate-shipping', [CartController::class, 'calculateShipping']);
     });
 
     // Coupon Routes
@@ -231,204 +231,16 @@ Route::prefix('v1')->group(function () {
     // Payment Gateway Routes
     require __DIR__.'/payment.php';
 
-    // Admin routes (require admin role)
-    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
-        
-
-        // Category Management
-        Route::prefix('categories')->group(function () {
-            Route::post('/', [CategoryController::class, 'store']);
-            Route::put('/{id}', [CategoryController::class, 'update']);
-            Route::delete('/{id}', [CategoryController::class, 'destroy']);
-        });
-
-        // Order Management
-        Route::prefix('orders')->group(function () {
-            Route::get('/all', [OrderController::class, 'adminIndex']);
-            Route::put('/{id}/status', [OrderController::class, 'updateStatus']);
-            Route::put('/{id}/payment-status', [OrderController::class, 'updatePaymentStatus']);
-        });
-
-        // Bundle Discount Management
-        Route::prefix('bundle-discounts')->group(function () {
-            Route::get('/', [BundleDiscountController::class, 'index']);
-            Route::post('/', [BundleDiscountController::class, 'store']);
-            Route::get('/{id}', [BundleDiscountController::class, 'show']);
-            Route::put('/{id}', [BundleDiscountController::class, 'update']);
-            Route::delete('/{id}', [BundleDiscountController::class, 'destroy']);
-            Route::post('/{id}/toggle-active', [BundleDiscountController::class, 'toggleActive']);
-            Route::post('/preview', [BundleDiscountController::class, 'previewDiscount']);
-        });
-
-        // Dashboard & Analytics
-        Route::get('/dashboard/overview', [AdminDashboardController::class, 'overview']);
-        Route::get('/dashboard/sales-analytics', [AdminDashboardController::class, 'salesAnalytics']);
-        Route::get('/dashboard/customer-analytics', [AdminDashboardController::class, 'customerAnalytics']);
-        Route::get('/dashboard/inventory-overview', [AdminDashboardController::class, 'inventoryOverview']);
-        Route::get('/dashboard/order-insights', [AdminDashboardController::class, 'orderInsights']);
-        Route::get('/dashboard/marketing-performance', [AdminDashboardController::class, 'marketingPerformance']);
-
-        // User Management
-        Route::prefix('users')->group(function () {
-            Route::get('/', [AdminUserController::class, 'index']);
-            Route::get('/{user}', [AdminUserController::class, 'show']);
-            Route::put('/{user}', [AdminUserController::class, 'update']);
-            Route::post('/{user}/reset-password', [AdminUserController::class, 'resetPassword']);
-            Route::post('/{user}/toggle-status', [AdminUserController::class, 'toggleStatus']);
-            Route::get('/{user}/analytics', [AdminUserController::class, 'getAnalytics']);
-            Route::get('/{user}/orders', [AdminUserController::class, 'getOrders']);
-            Route::get('/{user}/addresses', [AdminUserController::class, 'getAddresses']);
-        });
-
-        // Customers (alias for users)
-        Route::prefix('customers')->group(function () {
-            Route::get('/', [AdminUserController::class, 'index']);
-            Route::get('/{user}', [AdminUserController::class, 'show']);
-            Route::put('/{user}', [AdminUserController::class, 'update']);
-            Route::delete('/{user}', [AdminUserController::class, 'destroy']);
-        });
-
-        // Settings Management
-        Route::prefix('settings')->group(function () {
-            Route::get('/general', [SettingsController::class, 'getGeneral']);
-            Route::put('/general', [SettingsController::class, 'updateGeneral']);
-            Route::get('/roles', [SettingsController::class, 'getRoles']);
-            Route::post('/roles', [SettingsController::class, 'createRole']);
-            Route::put('/roles/{role}', [SettingsController::class, 'updateRole']);
-            Route::delete('/roles/{role}', [SettingsController::class, 'deleteRole']);
-            Route::get('/email-templates', [SettingsController::class, 'getEmailTemplates']);
-            Route::get('/payment', [SettingsController::class, 'getPayment']);
-            Route::get('/shipping', [SettingsController::class, 'getShipping']);
-        });
-
-        // Advanced Order Management
-        Route::prefix('orders')->group(function () {
-            Route::get('/', [AdminOrderController::class, 'index']);
-            Route::get('/{order}', [AdminOrderController::class, 'show']);
-            Route::put('/{order}/status', [AdminOrderController::class, 'updateStatus']);
-            Route::put('/{order}/payment-status', [AdminOrderController::class, 'updatePaymentStatus']);
-            Route::post('/{order}/cancel', [AdminOrderController::class, 'cancel']);
-            Route::post('/{order}/refund', [AdminOrderController::class, 'refund']);
-            Route::get('/{order}/timeline', [AdminOrderController::class, 'getTimeline']);
-        });
-
-        // Advanced Product Management
-        Route::prefix('products')->group(function () {
-            Route::get('/', [AdminProductController::class, 'index']);
-            Route::get('/{product}', [AdminProductController::class, 'show']);
-            Route::post('/', [AdminProductController::class, 'store']);
-            Route::put('/{product}', [AdminProductController::class, 'update']);
-            Route::delete('/{product}', [AdminProductController::class, 'destroy']);
-            Route::post('/{product}/images', [AdminProductController::class, 'uploadImages']);
-            Route::put('/{product}/toggle-status', [AdminProductController::class, 'toggleStatus']);
-            Route::get('/{product}/analytics', [AdminProductController::class, 'analytics']);
-        });
-
-        // System Management
-        Route::prefix('system')->group(function () {
-            Route::get('/health', function () {
-                return response()->json([
-                    'system_status' => 'healthy',
-                    'database_status' => 'connected',
-                    'cache_status' => 'active',
-                    'queue_status' => 'running',
-                    'storage_status' => 'accessible',
-                    'memory_usage' => memory_get_usage(true),
-                    'server_time' => now(),
-                ]);
-            });
-            
-            Route::post('/cache/clear', function () {
-                \Artisan::call('cache:clear');
-                return response()->json(['message' => 'Cache cleared successfully']);
-            });
-            
-            Route::post('/optimize', function () {
-                \Artisan::call('optimize');
-                return response()->json(['message' => 'Application optimized successfully']);
-            });
-        });
-
-        // Shipping Configuration Management
-        Route::prefix('shipping')->group(function () {
-            // Weight Slabs Management
-            Route::prefix('weight-slabs')->group(function () {
-                Route::get('/', [ShippingConfigController::class, 'getWeightSlabs']);
-                Route::post('/', [ShippingConfigController::class, 'storeWeightSlab']);
-                Route::put('/{id}', [ShippingConfigController::class, 'updateWeightSlab']);
-                Route::delete('/{id}', [ShippingConfigController::class, 'deleteWeightSlab']);
-                Route::post('/bulk-import', [ShippingConfigController::class, 'bulkImportWeightSlabs']);
-            });
-
-            // Shipping Rates Management
-            Route::prefix('rates')->group(function () {
-                Route::get('/', [ShippingConfigController::class, 'getShippingRates']);
-                Route::post('/', [ShippingConfigController::class, 'storeShippingRate']);
-                Route::put('/{id}', [ShippingConfigController::class, 'updateShippingRate']);
-                Route::delete('/{id}', [ShippingConfigController::class, 'deleteShippingRate']);
-                Route::post('/bulk-import', [ShippingConfigController::class, 'bulkImportShippingRates']);
-            });
-
-            // Pincode Zone Management
-            Route::prefix('pincodes')->group(function () {
-                Route::get('/', [ShippingConfigController::class, 'getPincodeZones']);
-                Route::post('/', [ShippingConfigController::class, 'storePincodeZone']);
-                Route::put('/{id}', [ShippingConfigController::class, 'updatePincodeZone']);
-                Route::delete('/{id}', [ShippingConfigController::class, 'deletePincodeZone']);
-                Route::post('/bulk-import', [ShippingConfigController::class, 'bulkImportPincodes']);
-                Route::post('/check-zone', [ShippingConfigController::class, 'checkPincodeZone']);
-            });
-
-            // Zone Management
-            Route::prefix('zones')->group(function () {
-                Route::get('/', [ShippingConfigController::class, 'getZones']);
-                Route::post('/', [ShippingConfigController::class, 'storeZone']);
-                Route::put('/{id}', [ShippingConfigController::class, 'updateZone']);
-                Route::delete('/{id}', [ShippingConfigController::class, 'deleteZone']);
-            });
-
-            // Testing & Analytics
-            Route::post('/test-calculation', [ShippingConfigController::class, 'testShippingCalculation']);
-            Route::get('/analytics', [ShippingConfigController::class, 'getShippingAnalytics']);
-            Route::get('/performance-metrics', [ShippingConfigController::class, 'getPerformanceMetrics']);
-        });
-
-        // Delivery Options Management
-        Route::prefix('delivery-options')->group(function () {
-            Route::get('/', [DeliveryOptionController::class, 'index']);
-            Route::get('/{deliveryOption}', [DeliveryOptionController::class, 'show']);
-            Route::post('/', [DeliveryOptionController::class, 'store']);
-            Route::put('/{deliveryOption}', [DeliveryOptionController::class, 'update']);
-            Route::delete('/{deliveryOption}', [DeliveryOptionController::class, 'destroy']);
-            Route::put('/{deliveryOption}/toggle-status', [DeliveryOptionController::class, 'toggleStatus']);
-            Route::post('/test-availability', [DeliveryOptionController::class, 'testAvailability']);
-            Route::post('/get-available', [DeliveryOptionController::class, 'getAvailableForConditions']);
-            Route::put('/sort-order', [DeliveryOptionController::class, 'updateSortOrder']);
-            Route::get('/analytics/overview', [DeliveryOptionController::class, 'analytics']);
-        });
-
-        // Shipping Insurance Management
-        Route::prefix('shipping-insurance')->group(function () {
-            Route::get('/', [ShippingInsuranceController::class, 'index']);
-            Route::get('/{insurance}', [ShippingInsuranceController::class, 'show']);
-            Route::post('/', [ShippingInsuranceController::class, 'store']);
-            Route::put('/{insurance}', [ShippingInsuranceController::class, 'update']);
-            Route::put('/{insurance}/toggle-status', [ShippingInsuranceController::class, 'toggleStatus']);
-            Route::post('/test-calculation', [ShippingInsuranceController::class, 'testCalculation']);
-        });
-
-        // Content Management
-        Route::prefix('content')->group(function () {
-            Route::put('/site-config', [ContentController::class, 'updateSiteConfig']);
-            Route::put('/homepage-config', [ContentController::class, 'updateHomepageConfig']);
-            Route::put('/navigation-config', [ContentController::class, 'updateNavigationConfig']);
-            Route::put('/pages/{slug}', [ContentController::class, 'updateContentPage']);
-            Route::post('/media/upload', [ContentController::class, 'uploadMedia']);
-            Route::get('/media/library', [ContentController::class, 'getMediaLibrary']);
-            Route::delete('/media/{id}', [ContentController::class, 'deleteMedia']);
-            Route::get('/theme-presets', [ContentController::class, 'getThemePresets']);
-        });
-    });
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Routes
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT: All admin routes have been moved to routes/admin.php
+    | They are automatically mounted at /api/v1/admin/* via bootstrap/app.php
+    | DO NOT add admin routes here to avoid duplication and conflicts.
+    |
+    */
 
     // Health check route
     Route::get('/health', function () {

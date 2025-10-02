@@ -83,28 +83,30 @@ class ZoneCalculationService
         $pickupPrefix3 = substr($pickupPincode, 0, 3);
         $deliveryPrefix3 = substr($deliveryPincode, 0, 3);
 
-        // Zone A: Same city
-        if ($pickupDetails['city'] === $deliveryDetails['city'] && 
-            !empty($pickupDetails['city'])) {
+        // Zone A: Same city (first priority)
+        if (!empty($pickupDetails['city']) &&
+            !empty($deliveryDetails['city']) &&
+            strtolower(trim($pickupDetails['city'])) === strtolower(trim($deliveryDetails['city']))) {
             return 'A';
         }
 
-        // Zone E: Northeast or J&K (based on pincode prefixes)
-        if (in_array($pickupPrefix3, $this->northeastJKPrefixes) || 
+        // Zone E: Northeast or J&K (second priority - highest cost zone)
+        if (in_array($pickupPrefix3, $this->northeastJKPrefixes) ||
             in_array($deliveryPrefix3, $this->northeastJKPrefixes)) {
             return 'E';
         }
 
-        // Zone C: Metro to Metro (based on pincode prefixes)
-        if (in_array($pickupPrefix3, $this->metroCityPrefixes) && 
-            in_array($deliveryPrefix3, $this->metroCityPrefixes)) {
-            return 'C';
+        // Zone B: Same state (third priority - before metro to metro)
+        if (!empty($pickupDetails['state']) &&
+            !empty($deliveryDetails['state']) &&
+            strtolower(trim($pickupDetails['state'])) === strtolower(trim($deliveryDetails['state']))) {
+            return 'B';
         }
 
-        // Zone B: Same state
-        if ($pickupDetails['state'] === $deliveryDetails['state'] && 
-            !empty($pickupDetails['state'])) {
-            return 'B';
+        // Zone C: Metro to Metro (fourth priority - only for different states)
+        if (in_array($pickupPrefix3, $this->metroCityPrefixes) &&
+            in_array($deliveryPrefix3, $this->metroCityPrefixes)) {
+            return 'C';
         }
 
         // Zone D: Rest of India (default)

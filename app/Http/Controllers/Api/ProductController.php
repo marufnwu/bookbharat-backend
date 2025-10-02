@@ -27,9 +27,11 @@ class ProductController extends Controller
 
         // Search functionality
         if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%')
+            $query->where(function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
                   ->orWhere('description', 'like', '%' . $request->search . '%')
                   ->orWhere('sku', 'like', '%' . $request->search . '%');
+            });
         }
 
         // Category filter
@@ -361,15 +363,19 @@ class ProductController extends Controller
      */
     public function getFrequentlyBoughtTogether($id)
     {
-        // Handle both ID and slug
+        // Handle both ID and slug - load with images relationship
         if (is_numeric($id)) {
-            $product = Product::findOrFail($id);
+            $product = Product::with('images')->findOrFail($id);
         } else {
-            $product = Product::where('slug', $id)->firstOrFail();
+            $product = Product::with('images')->where('slug', $id)->firstOrFail();
             $id = $product->id; // Use numeric ID for the service
         }
-        
+
         $result = $this->recommendationService->getFrequentlyBoughtTogether($id, 2);
+
+        // Get primary image (first image from images collection)
+        $primaryImage = $product->images->first();
+        $imageUrl = $primaryImage ? $primaryImage->image_url : null;
 
         return response()->json([
             'success' => true,
@@ -378,7 +384,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'name' => $product->name,
                     'price' => $product->price,
-                    'image_url' => $product->primary_image ? $product->primary_image->image_path : null
+                    'image_url' => $imageUrl
                 ],
                 'products' => $result['products'],
                 'bundle_data' => $result['bundle_data']

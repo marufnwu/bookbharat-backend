@@ -415,6 +415,7 @@ class ShippingConfigController extends Controller
     public function testCalculation(Request $request)
     {
         $validated = $request->validate([
+            'pickup_pincode' => 'nullable|string|size:6',
             'delivery_pincode' => 'required|string|size:6',
             'weight' => 'required|numeric|min:0.1',
             'order_value' => 'required|numeric|min:1',
@@ -436,8 +437,8 @@ class ShippingConfigController extends Controller
         ];
 
         try {
-            // Use configured pickup pincode instead of user input
-            $pickupPincode = $this->getDefaultPickupPincode();
+            // Use provided pickup pincode, or fall back to default warehouse
+            $pickupPincode = $validated['pickup_pincode'] ?? $this->getDefaultPickupPincode();
 
             $shippingData = $this->shippingService->calculateShippingCharges(
                 $pickupPincode,
@@ -691,5 +692,118 @@ class ShippingConfigController extends Controller
             'message' => 'Default warehouse updated successfully',
             'warehouse' => $warehouse->fresh()
         ]);
+    }
+
+    /**
+     * Get free shipping thresholds for all zones
+     */
+    public function getFreeShippingThresholds()
+    {
+        $zones = ['A', 'B', 'C', 'D', 'E'];
+        $thresholds = [];
+
+        foreach ($zones as $zone) {
+            // Get the most recent config for each zone
+            $config = \App\Models\ShippingZone::where('zone', $zone)
+                ->orderBy('id', 'desc')
+                ->first();
+
+            $thresholds[] = [
+                'zone' => $zone,
+                'zone_name' => $this->getZoneName($zone),
+                'threshold' => $config ? $config->free_shipping_threshold : $this->getDefaultThreshold($zone),
+                'enabled' => $config ? (bool) $config->free_shipping_enabled : false,
+                'has_custom_value' => $config && $config->free_shipping_threshold > 0,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'thresholds' => $thresholds
+        ]);
+    }
+
+    /**
+     * Update free shipping threshold for a zone
+     */
+    public function updateFreeShippingThreshold(Request $request)
+    {
+        $validated = $request->validate([
+            'zone' => 'required|in:A,B,C,D,E',
+            'threshold' => 'nullable|numeric|min:0|max:99999',
+            'enabled' => 'nullable|boolean',
+        ]);
+
+        try {
+            // Prepare update data
+            $updateData = [];
+            if (isset($validated['threshold'])) {
+                $updateData['free_shipping_threshold'] = $validated['threshold'];
+            }
+            if (isset($validated['enabled'])) {
+                $updateData['free_shipping_enabled'] = $validated['enabled'];
+            }
+
+            if (empty($updateData)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No data provided to update.'
+                ], 400);
+            }
+
+            // Update all shipping zones with this zone code
+            $updated = \App\Models\ShippingZone::where('zone', $validated['zone'])
+                ->update($updateData);
+
+            if ($updated === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No shipping zones found for this zone code. Please configure zone rates first.'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Free shipping configuration updated successfully',
+                'updated_count' => $updated
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update configuration: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get zone name helper
+     */
+    private function getZoneName($zone)
+    {
+        $names = [
+            'A' => 'Local (Within City)',
+            'B' => 'Regional (Within State)',
+            'C' => 'National (Metro to Metro)',
+            'D' => 'National (Rest of India)',
+            'E' => 'Special (Northeast/Islands)'
+        ];
+
+        return $names[$zone] ?? 'Unknown';
+    }
+
+    /**
+     * Get default threshold helper
+     */
+    private function getDefaultThreshold($zone)
+    {
+        $defaults = [
+            'A' => 499,
+            'B' => 699,
+            'C' => 999,
+            'D' => 1499,
+            'E' => 2499
+        ];
+
+        return $defaults[$zone] ?? 1499;
     }
 }
