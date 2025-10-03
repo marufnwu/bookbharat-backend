@@ -10,39 +10,54 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     *
+     * This seeder automatically detects the environment and runs appropriate seeders.
+     * - Production: Essential data only
+     * - Development/Local: Full test data
+     *
+     * Use custom commands for explicit control:
+     * - php artisan db:seed-dev (for development)
+     * - php artisan db:seed-prod (for production)
      */
     public function run(): void
     {
-        // Call essential seeders in proper order
-        $this->call([
-            // First: Roles and Permissions (foundational)
-            RolePermissionSeeder::class,
+        $environment = app()->environment();
 
-            // Payment Configuration (essential for checkout)
-            PaymentConfigurationSeeder::class,
+        $this->command->info("═══════════════════════════════════════");
+        $this->command->info("   Environment: " . strtoupper($environment));
+        $this->command->info("═══════════════════════════════════════");
+        $this->command->newLine();
 
-            // Geographic and Shipping Configuration
-            // Note: Order is important - weight slabs must be created before zones
-            ShippingWeightSlabSeeder::class,  // Create weight slabs first
-            ShippingZoneSeeder::class,         // Then create zone rates for each weight slab
-            PincodeZoneSeeder::class,          // Map pincodes to zones
-            BundleDiscountRuleSeeder::class,   // Add shipping discount rules
-
-            // Marketing and Discounts
-            CouponsTableSeeder::class,
-
-            // Test Data
-             SystemTestSeeder::class,
-        ]);
-
-        // Create a test user if it doesn't exist
-        if (!User::where('email', 'test@example.com')->exists()) {
-            User::factory()->create([
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-            ]);
+        if ($environment === 'production') {
+            // Production environment - essential data only
+            $this->command->warn('Running PRODUCTION seeders (essential data only)...');
+            $this->call(ProductionSeeder::class);
+        } else {
+            // Development/local environment - full test data
+            $this->command->info('Running DEVELOPMENT seeders (includes test data)...');
+            $this->call(DevelopmentSeeder::class);
         }
 
-        $this->command->info('All seeders have been executed successfully!');
+        $this->command->newLine();
+        $this->command->info('═══════════════════════════════════════');
+        $this->command->info('   ✅ Seeding completed successfully!');
+        $this->command->info('═══════════════════════════════════════');
+
+        // Show environment-specific tips
+        if ($environment === 'production') {
+            $this->command->newLine();
+            $this->command->warn('⚠️  Production Tips:');
+            $this->command->line('   - Change admin password immediately');
+            $this->command->line('   - Configure payment gateway API keys');
+            $this->command->line('   - Import product catalog');
+            $this->command->line('   - Setup SSL and security measures');
+        } else {
+            $this->command->newLine();
+            $this->command->info('📝 Development Tips:');
+            $this->command->line('   - Test accounts created with password: "password"');
+            $this->command->line('   - Sample products and categories available');
+            $this->command->line('   - Test coupons ready for use');
+            $this->command->line('   - Run: php artisan serve');
+        }
     }
 }
