@@ -228,6 +228,12 @@ Route::prefix('v1')->group(function () {
         });
     });
 
+    // Public Tracking Route (customers can track their shipments)
+    Route::get('/shipping/{tracking}/track', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'trackShipment']);
+
+    // Webhook endpoints for carriers (needs to be public for carrier callbacks)
+    Route::post('/shipping/webhook/{carrier}', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'processWebhook']);
+
     // Payment Gateway Routes
     require __DIR__.'/payment.php';
 

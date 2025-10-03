@@ -99,6 +99,16 @@ class Order extends Model
         return $this->hasMany(PaymentRefund::class, 'order_id');
     }
 
+    public function shipment()
+    {
+        return $this->hasOne(Shipment::class);
+    }
+
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class);
+    }
+
     // Scopes
     public function scopePending($query)
     {

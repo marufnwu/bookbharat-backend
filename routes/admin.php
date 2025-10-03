@@ -448,4 +448,31 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::delete('/{variant}', [HeroConfigController::class, 'destroy']);
         Route::post('/set-active', [HeroConfigController::class, 'setActive']);
     });
+
+    // Multi-Carrier Shipping Management (Admin Only)
+    Route::prefix('shipping/multi-carrier')->group(function () {
+        Route::post('/rates/compare', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'compareRates']);
+        Route::post('/create', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'createShipment']);
+        Route::delete('/{shipment}/cancel', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'cancelShipment']);
+        Route::get('/carriers', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getCarriers']);
+        Route::get('/pickup-location', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getPickupLocation']);
+        Route::get('/carriers/{carrier}/services', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getCarrierServices']);
+        Route::post('/carriers/{carrier}/serviceability', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'checkServiceability']);
+        Route::get('/shipments/{shipment}/label', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getLabel']);
+        Route::get('/performance/analytics', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getPerformanceAnalytics']);
+
+        // Carrier Configuration
+        Route::get('/carriers/{carrier}/config', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getCarrierConfig']);
+        Route::put('/carriers/{carrier}/config', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'updateCarrierConfig']);
+        Route::post('/carriers/{carrier}/toggle', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'toggleCarrier']);
+        Route::post('/carriers/{carrier}/test', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'testCarrier']);
+        Route::delete('/carriers/{carrier}', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'deleteCarrier']);
+        Route::post('/sync-from-config', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'syncFromConfig']);
+
+        // Bulk Operations
+        Route::post('/bulk-create', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkCreateShipments']);
+        Route::post('/bulk-cancel', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkCancelShipments']);
+        Route::get('/bulk-track', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkTrackShipments']);
+    });
+
 });
