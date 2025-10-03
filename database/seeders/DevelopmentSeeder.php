@@ -147,7 +147,7 @@ class DevelopmentSeeder extends Seeder
                     'status' => collect(['pending', 'processing', 'completed', 'shipped'])->random(),
                     'payment_status' => collect(['pending', 'paid', 'failed'])->random(),
                     'subtotal' => 0,
-                    'shipping_charge' => rand(50, 200),
+                    'shipping_amount' => rand(50, 200),
                     'tax_amount' => 0,
                     'total_amount' => 0,
                     'shipping_address' => json_encode([
@@ -195,7 +195,7 @@ class DevelopmentSeeder extends Seeder
                 $order->update([
                     'subtotal' => $subtotal,
                     'tax_amount' => $taxAmount,
-                    'total_amount' => $subtotal + $taxAmount + $order->shipping_charge,
+                    'total_amount' => $subtotal + $taxAmount + $order->shipping_amount,
                 ]);
             }
         }

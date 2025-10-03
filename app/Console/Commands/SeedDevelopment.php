@@ -46,7 +46,8 @@ class SeedDevelopment extends Command
         if ($this->option('fresh')) {
             if ($this->confirm('⚠️  This will DELETE ALL DATA and rebuild the database. Continue?')) {
                 $this->warn('Wiping database...');
-                Artisan::call('migrate:fresh');
+                // Use $this->call to preserve output
+                $this->call('migrate:fresh');
                 $this->info('✅ Database wiped and migrated fresh');
                 $this->newLine();
             } else {
@@ -62,15 +63,11 @@ class SeedDevelopment extends Command
         $startTime = microtime(true);
 
         try {
-            Artisan::call('db:seed', [
+            // Use $this->call instead of Artisan::call to preserve output
+            $this->call('db:seed', [
                 '--class' => DevelopmentSeeder::class,
                 '--force' => true,
             ]);
-
-            $output = Artisan::output();
-            if ($output) {
-                $this->line($output);
-            }
 
             $executionTime = round(microtime(true) - $startTime, 2);
 

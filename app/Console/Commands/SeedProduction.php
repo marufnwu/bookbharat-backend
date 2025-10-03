@@ -75,7 +75,8 @@ class SeedProduction extends Command
             }
 
             $this->warn('Wiping database...');
-            Artisan::call('migrate:fresh');
+            // Use $this->call to preserve output
+            $this->call('migrate:fresh');
             $this->info('✅ Database wiped and migrated fresh');
             $this->newLine();
         }
@@ -93,15 +94,11 @@ class SeedProduction extends Command
         $startTime = microtime(true);
 
         try {
-            Artisan::call('db:seed', [
+            // Use $this->call instead of Artisan::call to preserve output
+            $this->call('db:seed', [
                 '--class' => ProductionSeeder::class,
                 '--force' => true,
             ]);
-
-            $output = Artisan::output();
-            if ($output) {
-                $this->line($output);
-            }
 
             $executionTime = round(microtime(true) - $startTime, 2);
 
