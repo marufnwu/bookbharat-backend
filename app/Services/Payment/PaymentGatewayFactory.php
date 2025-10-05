@@ -98,7 +98,7 @@ class PaymentGatewayFactory
                     if ($gateway->isAvailable()) {
                         $setting = PaymentSetting::where('unique_keyword', $key)->first();
 
-                        $availableGateways[] = [
+                        $gatewayData = [
                             'gateway' => $key,
                             'name' => $gateway->getName(),
                             'display_name' => $setting->name ?? $gateway->getName(),
@@ -107,6 +107,23 @@ class PaymentGatewayFactory
                             'priority' => $setting->priority ?? 0,
                             'is_production' => $setting->is_production ?? false
                         ];
+
+                        // Add COD-specific configuration if available
+                        if ($setting && strpos($key, 'cod') !== false) {
+                            $config = $setting->configuration ?? [];
+
+                            // Include advance payment settings
+                            if (isset($config['advance_payment'])) {
+                                $gatewayData['advance_payment'] = $config['advance_payment'];
+                            }
+
+                            // Include service charges settings
+                            if (isset($config['service_charges'])) {
+                                $gatewayData['service_charges'] = $config['service_charges'];
+                            }
+                        }
+
+                        $availableGateways[] = $gatewayData;
                     }
                 } catch (\Exception $e) {
                     Log::debug("Gateway {$key} is not available: " . $e->getMessage());

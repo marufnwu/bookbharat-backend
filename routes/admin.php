@@ -495,5 +495,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::delete('/{taxConfiguration}', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'destroy']);
         Route::patch('/{taxConfiguration}/toggle', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'toggleStatus']);
     });
-    
+
+    // Admin Settings (Payment Flow, etc.)
+    Route::prefix('admin-settings')->group(function () {
+        Route::get('/payment-flow', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'getPaymentFlowSettings']);
+        Route::put('/payment-flow', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'updatePaymentFlowSettings']);
+    });
+
 });

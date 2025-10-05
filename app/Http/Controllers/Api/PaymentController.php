@@ -34,9 +34,17 @@ class PaymentController extends Controller
 
             $gateways = PaymentGatewayFactory::getGatewaysForOrder($amount, $currency);
 
+            // Get payment flow settings from AdminSetting
+            $paymentFlowType = \App\Models\AdminSetting::get('payment_flow_type', 'two_tier');
+            $defaultPaymentType = \App\Models\AdminSetting::get('payment_default_type', 'none');
+
             return response()->json([
                 'success' => true,
-                'gateways' => $gateways
+                'gateways' => $gateways,
+                'payment_flow' => [
+                    'type' => $paymentFlowType,
+                    'default_payment_type' => $defaultPaymentType
+                ]
             ]);
 
         } catch (\Exception $e) {
