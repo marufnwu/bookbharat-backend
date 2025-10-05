@@ -932,4 +932,60 @@ class ProductController extends Controller
             'analytics' => $analytics
         ]);
     }
+
+    /**
+     * Export products
+     */
+    public function exportProducts(Request $request)
+    {
+        $query = Product::with(['category:id,name']);
+
+        // Apply filters if provided
+        if ($request->category_id) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->stock_status) {
+            switch ($request->stock_status) {
+                case 'in_stock':
+                    $query->where('stock_quantity', '>', 0);
+                    break;
+                case 'low_stock':
+                    $query->where('stock_quantity', '>', 0)
+                          ->where('stock_quantity', '<=', 10);
+                    break;
+                case 'out_of_stock':
+                    $query->where('stock_quantity', '<=', 0);
+                    break;
+            }
+        }
+
+        $products = $query->get();
+
+        $exportData = $products->map(function ($product) {
+            return [
+                'SKU' => $product->sku,
+                'Name' => $product->name,
+                'Category' => $product->category->name ?? 'N/A',
+                'Price' => $product->price,
+                'Discount Price' => $product->discount_price ?? 'N/A',
+                'Stock Quantity' => $product->stock_quantity,
+                'Status' => $product->status,
+                'Rating' => $product->rating ?? 0,
+                'Review Count' => $product->review_count ?? 0,
+                'Created At' => $product->created_at->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $exportData,
+            'total' => $exportData->count(),
+            'filters' => $request->only(['category_id', 'status', 'stock_status'])
+        ]);
+    }
 }

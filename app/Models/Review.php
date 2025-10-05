@@ -18,13 +18,24 @@ class Review extends Model
         'title',
         'comment',
         'is_verified_purchase',
-        'is_approved'
+        'is_approved',
+        'status',
+        'is_reported',
+        'report_count',
+        'rejection_reason',
+        'moderated_by',
+        'moderated_at',
+        'images'
     ];
 
     protected $casts = [
         'rating' => 'integer',
         'is_verified_purchase' => 'boolean',
         'is_approved' => 'boolean',
+        'is_reported' => 'boolean',
+        'report_count' => 'integer',
+        'moderated_at' => 'datetime',
+        'images' => 'array',
     ];
 
     // Relationships

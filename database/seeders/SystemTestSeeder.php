@@ -111,38 +111,38 @@ class SystemTestSeeder extends Seeder
     {
         $categories = Category::all();
 
-        // Use storage paths (not full URLs) for book images
-        // The ProductImage model will generate the full URL via the image_url accessor
+        // Use actual working placeholder images from picsum or placeholder services
+        // These are real URLs that will work for demo/test purposes
         $bookImages = [
             'fiction' => [
-                'book-covers/placeholder-fiction-1.jpg',
-                'book-covers/placeholder-fiction-2.jpg',
-                'book-covers/placeholder-fiction-3.jpg'
+                'https://picsum.photos/400/600?random=1',
+                'https://picsum.photos/400/600?random=2',
+                'https://picsum.photos/400/600?random=3'
             ],
             'non-fiction' => [
-                'book-covers/placeholder-nonfiction-1.jpg',
-                'book-covers/placeholder-nonfiction-2.jpg',
-                'book-covers/placeholder-nonfiction-3.jpg'
+                'https://picsum.photos/400/600?random=4',
+                'https://picsum.photos/400/600?random=5',
+                'https://picsum.photos/400/600?random=6'
             ],
             'mystery' => [
-                'book-covers/placeholder-mystery-1.jpg',
-                'book-covers/placeholder-mystery-2.jpg',
-                'book-covers/placeholder-mystery-3.jpg'
+                'https://picsum.photos/400/600?random=7',
+                'https://picsum.photos/400/600?random=8',
+                'https://picsum.photos/400/600?random=9'
             ],
             'romance' => [
-                'book-covers/placeholder-romance-1.jpg',
-                'book-covers/placeholder-romance-2.jpg',
-                'book-covers/placeholder-romance-3.jpg'
+                'https://picsum.photos/400/600?random=10',
+                'https://picsum.photos/400/600?random=11',
+                'https://picsum.photos/400/600?random=12'
             ],
             'scifi' => [
-                'book-covers/placeholder-scifi-1.jpg',
-                'book-covers/placeholder-scifi-2.jpg',
-                'book-covers/placeholder-scifi-3.jpg'
+                'https://picsum.photos/400/600?random=13',
+                'https://picsum.photos/400/600?random=14',
+                'https://picsum.photos/400/600?random=15'
             ],
             'biography' => [
-                'book-covers/placeholder-biography-1.jpg',
-                'book-covers/placeholder-biography-2.jpg',
-                'book-covers/placeholder-biography-3.jpg'
+                'https://picsum.photos/400/600?random=16',
+                'https://picsum.photos/400/600?random=17',
+                'https://picsum.photos/400/600?random=18'
             ]
         ];
 

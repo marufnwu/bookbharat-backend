@@ -475,4 +475,25 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/bulk-track', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkTrackShipments']);
     });
 
+    // Order Charges Management
+    Route::prefix('order-charges')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\OrderChargeController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Admin\OrderChargeController::class, 'store']);
+        Route::get('/{orderCharge}', [\App\Http\Controllers\Admin\OrderChargeController::class, 'show']);
+        Route::put('/{orderCharge}', [\App\Http\Controllers\Admin\OrderChargeController::class, 'update']);
+        Route::delete('/{orderCharge}', [\App\Http\Controllers\Admin\OrderChargeController::class, 'destroy']);
+        Route::patch('/{orderCharge}/toggle', [\App\Http\Controllers\Admin\OrderChargeController::class, 'toggleStatus']);
+        Route::post('/update-priority', [\App\Http\Controllers\Admin\OrderChargeController::class, 'updatePriority']);
+    });
+
+    // Tax Configurations Management
+    Route::prefix('tax-configurations')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'store']);
+        Route::get('/{taxConfiguration}', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'show']);
+        Route::put('/{taxConfiguration}', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'update']);
+        Route::delete('/{taxConfiguration}', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'destroy']);
+        Route::patch('/{taxConfiguration}/toggle', [\App\Http\Controllers\Admin\TaxConfigurationController::class, 'toggleStatus']);
+    });
+    
 });

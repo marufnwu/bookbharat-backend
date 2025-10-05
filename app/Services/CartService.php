@@ -9,25 +9,34 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\PersistentCart;
 use App\Models\Coupon;
+use App\Models\AdminSetting;
 use App\Jobs\SendAbandonedCartEmail;
 use Illuminate\Support\Str;
 use App\Services\ProductRecommendationService;
 use App\Services\ShippingService;
+use App\Services\ChargeCalculationService;
+use App\Services\TaxCalculationService;
 
 class CartService
 {
     protected PricingEngine $pricingEngine;
     protected ProductRecommendationService $recommendationService;
     protected ShippingService $shippingService;
+    protected ChargeCalculationService $chargeService;
+    protected TaxCalculationService $taxService;
 
     public function __construct(
         PricingEngine $pricingEngine,
         ProductRecommendationService $recommendationService,
-        ShippingService $shippingService
+        ShippingService $shippingService,
+        ChargeCalculationService $chargeService,
+        TaxCalculationService $taxService
     ) {
         $this->pricingEngine = $pricingEngine;
         $this->recommendationService = $recommendationService;
         $this->shippingService = $shippingService;
+        $this->chargeService = $chargeService;
+        $this->taxService = $taxService;
     }
 
     public function addToCart($productId, $variantId = null, $quantity = 1, $attributes = [], $userId = null, $sessionId = null)
@@ -266,9 +275,6 @@ class CartService
         $totalDiscount = max($couponDiscount, $bundleDiscount); // Use better of the two
         $discountedSubtotal = max(0, $subtotal - $totalDiscount);
 
-        // Calculate tax on discounted subtotal (before shipping)
-        $taxAmount = $discountedSubtotal * 0.18; // 18% GST
-
         // Calculate REAL shipping using ShippingService
         $shippingCost = 0;
         $shippingDetails = null;
@@ -340,8 +346,30 @@ class CartService
             ];
         }
 
+        // Prepare order context for charge and tax calculation
+        $paymentMethod = request()->input('payment_method', 'online'); // Default to online payment
+        $orderContext = [
+            'payment_method' => $paymentMethod,
+            'order_value' => $subtotal,
+            'discounted_value' => $discountedSubtotal,
+            'shipping_cost' => $shippingCost,
+            'pincode' => $deliveryPincode,
+            'state' => null, // TODO: Get state from address if available
+            'categories' => $cart->items->pluck('product.category_id')->unique()->toArray(),
+        ];
+
+        // Calculate all applicable charges using ChargeCalculationService
+        $chargesResult = $this->chargeService->calculateCharges($orderContext);
+        $totalCharges = $chargesResult['total_charges'];
+        $chargesBreakdown = $chargesResult['charges'];
+
+        // Calculate taxes using TaxCalculationService
+        $taxesResult = $this->taxService->calculateTaxes($orderContext, $chargesResult);
+        $taxAmount = $taxesResult['total_tax'];
+        $taxesBreakdown = $taxesResult['taxes'];
+
         // Calculate final total
-        $total = $discountedSubtotal + $taxAmount + $shippingCost;
+        $total = $discountedSubtotal + $taxAmount + $shippingCost + $totalCharges;
 
         $summary = [
             'total_items' => $totalItems,
@@ -354,8 +382,12 @@ class CartService
             'total_discount' => round($totalDiscount, 2),
             'discounted_subtotal' => round($discountedSubtotal, 2),
             'tax_amount' => round($taxAmount, 2),
+            'taxes_breakdown' => $taxesBreakdown,
             'shipping_cost' => round($shippingCost, 2),
             'shipping_details' => $shippingDetails,
+            'charges' => $chargesBreakdown,
+            'total_charges' => round($totalCharges, 2),
+            'payment_method' => $paymentMethod,
             'total' => round($total, 2),
             'currency' => 'INR',
             'is_empty' => false,

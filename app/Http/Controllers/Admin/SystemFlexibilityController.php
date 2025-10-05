@@ -183,6 +183,14 @@ class SystemFlexibilityController extends Controller
     }
 
     /**
+     * Alias for getRateLimiting route compatibility
+     */
+    public function getRateLimiting()
+    {
+        return $this->getApiRateLimits();
+    }
+
+    /**
      * Update API rate limits
      */
     public function updateApiRateLimits(Request $request)

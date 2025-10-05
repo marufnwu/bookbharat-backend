@@ -22,6 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
 
+        // Enable CORS for API routes
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
         // Exclude payment webhook routes from CSRF verification
         $middleware->validateCsrfTokens(except: [
             'api/v1/payment/webhook/*',

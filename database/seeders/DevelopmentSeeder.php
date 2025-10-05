@@ -180,13 +180,13 @@ class DevelopmentSeeder extends Seeder
                     $itemTotal = $price * $quantity;
                     $subtotal += $itemTotal;
 
-                    $order->items()->create([
+                    $order->orderItems()->create([
                         'product_id' => $product->id,
                         'product_name' => $product->name,
                         'product_sku' => $product->sku,
-                        'price' => $price,
+                        'unit_price' => $price,
                         'quantity' => $quantity,
-                        'total' => $itemTotal,
+                        'total_price' => $itemTotal,
                     ]);
                 }
 

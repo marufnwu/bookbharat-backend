@@ -35,6 +35,12 @@ class ProductImage extends Model
     // Accessors
     public function getImageUrlAttribute()
     {
+        // Check if image_path is already a full URL
+        if (filter_var($this->image_path, FILTER_VALIDATE_URL)) {
+            return $this->image_path;
+        }
+
+        // Otherwise, assume it's a local storage path
         return Storage::disk('public')->url($this->image_path);
     }
 }

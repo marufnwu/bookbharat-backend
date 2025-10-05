@@ -385,17 +385,96 @@ class OrderController extends Controller
                     return ['success' => true, 'reference' => 'CASHFREE_' . uniqid()];
                 }
                 break;
-            
+
             case 'store_credit':
                 // Add store credit to user account
                 $order->user->increment('store_credit', $amount);
                 return ['success' => true, 'reference' => 'CREDIT_' . uniqid()];
-            
+
             case 'manual':
                 // Manual refund - just record it
                 return ['success' => true, 'reference' => 'MANUAL_' . uniqid()];
         }
 
         return ['success' => false, 'message' => 'Refund method not supported'];
+    }
+
+    public function getInvoice(Order $order)
+    {
+        try {
+            $order->load(['user', 'orderItems.product', 'shippingAddress', 'billingAddress']);
+
+            // Prepare invoice data
+            $invoiceData = [
+                'order' => $order,
+                'company' => [
+                    'name' => config('app.name', 'BookBharat'),
+                    'address' => 'BookBharat HQ, 123 Knowledge Street',
+                    'city' => 'Mumbai, Maharashtra 400001',
+                    'country' => 'India',
+                    'email' => 'support@bookbharat.com',
+                    'phone' => '+91 9876543210',
+                    'gstin' => 'GSTIN123456789',
+                ],
+                'invoice_number' => 'INV-' . $order->order_number,
+                'invoice_date' => $order->created_at->format('d M Y'),
+                'due_date' => $order->created_at->addDays(7)->format('d M Y'),
+            ];
+
+            // Return as JSON for now (can be enhanced to generate PDF)
+            return response()->json([
+                'success' => true,
+                'invoice' => $invoiceData,
+                'order_number' => $order->order_number,
+                'download_url' => route('admin.orders.invoice.download', $order->id)
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate invoice: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function exportOrders(Request $request)
+    {
+        $query = Order::with(['user:id,name,email'])->withCount('orderItems');
+
+        // Apply filters if provided
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->date_from) {
+            $query->where('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->date_to) {
+            $query->where('created_at', '<=', $request->date_to);
+        }
+
+        $orders = $query->get();
+
+        $exportData = $orders->map(function ($order) {
+            return [
+                'Order Number' => $order->order_number,
+                'Customer Name' => $order->user->name ?? 'N/A',
+                'Customer Email' => $order->user->email ?? 'N/A',
+                'Total Amount' => $order->total_amount,
+                'Status' => $order->status,
+                'Payment Status' => $order->payment_status,
+                'Payment Method' => $order->payment_method,
+                'Items Count' => $order->order_items_count,
+                'Created At' => $order->created_at->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $exportData,
+            'total' => $exportData->count(),
+            'filters' => $request->only(['status', 'date_from', 'date_to'])
+        ]);
     }
 }
