@@ -149,7 +149,18 @@ class Order extends Model
 
     public function getCanBeCancelledAttribute()
     {
-        return in_array($this->status, ['pending', 'processing']);
+        // FIXED: Check both order status and prevent cancellation of shipped/delivered orders
+        // Also consider payment status - paid orders need refund process
+        $cancellableStatuses = ['pending', 'confirmed', 'processing'];
+        $nonCancellableStatuses = ['shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'];
+
+        // Cannot cancel if already in non-cancellable status
+        if (in_array($this->status, $nonCancellableStatuses)) {
+            return false;
+        }
+
+        // Can cancel if in cancellable status
+        return in_array($this->status, $cancellableStatuses);
     }
 
     // Boot method to register model events

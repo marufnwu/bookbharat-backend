@@ -30,6 +30,10 @@ class Category extends Model
         'sort_order' => 'integer',
     ];
 
+    protected $appends = [
+        'image_url'
+    ];
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable();

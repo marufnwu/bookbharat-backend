@@ -66,7 +66,10 @@ class OrderController extends Controller
         } else {
             $request->validate([
                 'shipping_address' => 'required|array',
-                'shipping_address.name' => 'required|string|max:255',
+                // Accept either 'name' OR 'first_name' + 'last_name'
+                'shipping_address.first_name' => 'required_without:shipping_address.name|string|max:255',
+                'shipping_address.last_name' => 'nullable|string|max:255',
+                'shipping_address.name' => 'required_without:shipping_address.first_name|string|max:255',
                 'shipping_address.phone' => 'required|string|max:20',
                 'shipping_address.email' => 'nullable|email',
                 'shipping_address.address_line_1' => 'required|string|max:255',
@@ -75,7 +78,10 @@ class OrderController extends Controller
                 'shipping_address.postal_code' => 'required|string|max:10',
                 'shipping_address.country' => 'required|string|max:100',
                 'billing_address' => 'required|array',
-                'billing_address.name' => 'required|string|max:255',
+                // Accept either 'name' OR 'first_name' + 'last_name'
+                'billing_address.first_name' => 'required_without:billing_address.name|string|max:255',
+                'billing_address.last_name' => 'nullable|string|max:255',
+                'billing_address.name' => 'required_without:billing_address.first_name|string|max:255',
                 'billing_address.phone' => 'required|string|max:20',
                 'billing_address.email' => 'nullable|email',
                 'billing_address.address_line_1' => 'required|string|max:255',
@@ -133,6 +139,18 @@ class OrderController extends Controller
                 $shippingAddressData = $request->shipping_address;
                 $billingAddressData = $request->billing_address;
 
+                // Normalize name field (combine first_name + last_name if 'name' not present)
+                if (!isset($shippingAddressData['name']) && isset($shippingAddressData['first_name'])) {
+                    $shippingAddressData['name'] = trim(
+                        ($shippingAddressData['first_name'] ?? '') . ' ' . ($shippingAddressData['last_name'] ?? '')
+                    );
+                }
+                if (!isset($billingAddressData['name']) && isset($billingAddressData['first_name'])) {
+                    $billingAddressData['name'] = trim(
+                        ($billingAddressData['first_name'] ?? '') . ' ' . ($billingAddressData['last_name'] ?? '')
+                    );
+                }
+
                 // Get delivery pincode for shipping calculation
                 $deliveryPincode = $request->shipping_address['postal_code'];
             }
@@ -144,7 +162,17 @@ class OrderController extends Controller
             // Use server-calculated shipping amount (NEVER from client)
             $shippingAmount = $cartSummary['shipping_cost'];
             $discountAmount = $cartSummary['coupon_discount'] ?? 0;
-            $totalAmount = $cartSummary['discounted_subtotal'] + $cartSummary['tax_amount'] + $shippingAmount;
+            $totalAmount = $cartSummary['discounted_subtotal'] + $cartSummary['tax_amount'] + $shippingAmount + ($cartSummary['total_charges'] ?? 0);
+
+            // Prepare order metadata (coupon info, session, etc.)
+            $metadata = [];
+            if ($cartSummary['coupon_code']) {
+                $metadata['coupon_code'] = $cartSummary['coupon_code'];
+                $metadata['coupon_discount'] = $discountAmount;
+            }
+            if ($sessionId) {
+                $metadata['session_id'] = $sessionId;
+            }
 
             // Create order
             $order = Order::create([
@@ -161,6 +189,7 @@ class OrderController extends Controller
                 'billing_address' => $billingAddressData,
                 'shipping_address' => $shippingAddressData,
                 'notes' => $request->notes,
+                'metadata' => $metadata,
             ]);
 
             // Create order items from cart (we already have $cart from validation)
@@ -190,10 +219,7 @@ class OrderController extends Controller
                 }
             }
 
-            // Apply coupon if provided
-            if ($request->coupon_code) {
-                $this->cartService->applyCoupon($request->coupon_code, $userId, $sessionId);
-            }
+            // Coupon already applied and stored in metadata - no need to apply again
 
             // Process payment - this will initiate payment with the gateway
             $paymentResult = $this->paymentService->processPayment($order, $request->payment_method);
