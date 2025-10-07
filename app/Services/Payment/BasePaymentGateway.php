@@ -5,7 +5,7 @@ namespace App\Services\Payment;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\PaymentSetting;
+use App\Models\PaymentMethod;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 
@@ -26,12 +26,12 @@ abstract class BasePaymentGateway implements PaymentGatewayInterface
      */
     protected function loadConfiguration()
     {
-        $setting = PaymentSetting::where('unique_keyword', $this->getGatewayKeyword())->first();
+        $setting = PaymentMethod::where('payment_method', $this->getGatewayKeyword())->first();
 
         if ($setting) {
             $this->config = $setting->configuration ?? [];
-            $this->isProduction = $setting->is_production ?? false;
-            $this->supportedCurrencies = $setting->supported_currencies ?? ['INR'];
+            $this->isProduction = $setting->is_production_mode ?? false;
+            $this->supportedCurrencies = ['INR']; // Fixed to INR
         } else {
             Log::warning("Payment gateway {$this->getGatewayKeyword()} configuration not found");
             $this->config = [];
@@ -56,8 +56,8 @@ abstract class BasePaymentGateway implements PaymentGatewayInterface
      */
     public function isAvailable(): bool
     {
-        $setting = PaymentSetting::where('unique_keyword', $this->getGatewayKeyword())
-            ->where('is_active', true)
+        $setting = PaymentMethod::where('payment_method', $this->getGatewayKeyword())
+            ->where('is_enabled', true)
             ->first();
 
         return $setting !== null && $this->hasRequiredConfiguration();
@@ -220,8 +220,8 @@ abstract class BasePaymentGateway implements PaymentGatewayInterface
      */
     public function getDisplayName(): string
     {
-        $setting = PaymentSetting::where('unique_keyword', $this->getGatewayKeyword())->first();
-        return $setting ? $setting->name : $this->getName();
+        $setting = PaymentMethod::where('payment_method', $this->getGatewayKeyword())->first();
+        return $setting ? $setting->display_name : $this->getName();
     }
 
     /**
@@ -229,7 +229,7 @@ abstract class BasePaymentGateway implements PaymentGatewayInterface
      */
     public function getDescription(): string
     {
-        $setting = PaymentSetting::where('unique_keyword', $this->getGatewayKeyword())->first();
+        $setting = PaymentMethod::where('payment_method', $this->getGatewayKeyword())->first();
         return $setting ? $setting->description : '';
     }
 

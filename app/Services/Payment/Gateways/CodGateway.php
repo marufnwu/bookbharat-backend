@@ -5,7 +5,7 @@ namespace App\Services\Payment\Gateways;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\PaymentSetting;
+use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -16,7 +16,7 @@ class CodGateway implements PaymentGatewayInterface
 
     public function __construct()
     {
-        $this->settings = PaymentSetting::where('unique_keyword', 'cod')->first();
+        $this->settings = PaymentMethod::where('payment_method', 'cod')->first();
         $this->config = $this->settings ? $this->settings->configuration : [
             'service_charge' => 0,
             'min_order_amount' => 100,
@@ -31,7 +31,7 @@ class CodGateway implements PaymentGatewayInterface
 
     public function getDisplayName(): string
     {
-        return $this->settings->name ?? 'Cash on Delivery';
+        return $this->settings->display_name ?? 'Cash on Delivery';
     }
 
     public function getDescription(): string
@@ -41,12 +41,12 @@ class CodGateway implements PaymentGatewayInterface
 
     public function isAvailable(): bool
     {
-        return $this->settings ? $this->settings->is_active : true;
+        return $this->settings ? $this->settings->is_enabled : true;
     }
 
     public function getSupportedCurrencies(): array
     {
-        return $this->settings->supported_currencies ?? ['INR'];
+        return ['INR'];
     }
 
     public function validateConfiguration(): bool

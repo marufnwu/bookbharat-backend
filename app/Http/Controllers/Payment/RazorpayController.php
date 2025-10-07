@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Payment;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\PaymentSetting;
+use App\Models\PaymentMethod;
 use App\Services\OrderService;
 use App\Services\CartService;
 use Razorpay\Api\Api;
@@ -35,13 +35,13 @@ class RazorpayController extends Controller
     private function initializeRazorpayConfig(): void
     {
         try {
-            $data = PaymentSetting::whereUniqueKeyword('razorpay')->first();
+            $data = PaymentMethod::where('payment_method', 'razorpay')->first();
 
             if (!$data) {
                 throw new \RuntimeException('Razorpay payment gateway not configured');
             }
 
-            $paydata = $data->convertJsonData();
+            $paydata = $data->configuration ?? [];
             $this->keyId = $paydata['key'] ?? '';
             $this->keySecret = $paydata['secret'] ?? '';
 
@@ -243,9 +243,8 @@ class RazorpayController extends Controller
         try {
             // Verify webhook signature
             $webhookSignature = $request->header('X-Razorpay-Signature');
-            $webhookSecret = PaymentSetting::whereUniqueKeyword('razorpay')
-                ->first()
-                ->getConfig('webhook_secret');
+            $paymentMethod = PaymentMethod::where('payment_method', 'razorpay')->first();
+            $webhookSecret = $paymentMethod->configuration['webhook_secret'] ?? null;
 
             if ($webhookSecret) {
                 $expectedSignature = hash_hmac('sha256', $request->getContent(), $webhookSecret);

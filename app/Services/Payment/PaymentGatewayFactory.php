@@ -10,7 +10,7 @@ use App\Services\Payment\Gateways\CashfreeGateway;
 use App\Services\Payment\Gateways\CodGateway;
 use App\Services\Payment\Gateways\StripeGateway;
 use App\Services\Payment\Gateways\PaypalGateway;
-use App\Models\PaymentSetting;
+use App\Models\PaymentMethod;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -96,16 +96,16 @@ class PaymentGatewayFactory
                     $gateway = self::create($key);
 
                     if ($gateway->isAvailable()) {
-                        $setting = PaymentSetting::where('unique_keyword', $key)->first();
+                        $setting = PaymentMethod::where('payment_method', $key)->first();
 
                         $gatewayData = [
                             'gateway' => $key,
                             'name' => $gateway->getName(),
-                            'display_name' => $setting->name ?? $gateway->getName(),
+                            'display_name' => $setting->display_name ?? $gateway->getName(),
                             'description' => $setting->description ?? '',
                             'supported_currencies' => $gateway->getSupportedCurrencies(),
                             'priority' => $setting->priority ?? 0,
-                            'is_production' => $setting->is_production ?? false
+                            'is_production' => $setting->is_production_mode ?? false
                         ];
 
                         // Add COD-specific configuration if available
@@ -150,8 +150,8 @@ class PaymentGatewayFactory
         $cacheKey = "payment_gateway_enabled_{$gateway}";
 
         return Cache::remember($cacheKey, 3600, function () use ($gateway) {
-            $setting = PaymentSetting::where('unique_keyword', $gateway)
-                ->where('is_active', true)
+            $setting = PaymentMethod::where('payment_method', $gateway)
+                ->where('is_enabled', true)
                 ->first();
 
             return $setting !== null;

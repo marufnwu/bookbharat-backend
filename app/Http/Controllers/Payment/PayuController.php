@@ -37,7 +37,7 @@ class PayuController extends Controller
     private function initializePayuConfig(): void
     {
         try {
-            $data = PaymentSetting::whereUniqueKeyword('payu')->first();
+            $data = PaymentMethod::where('payment_method',('payu')->first();
 
             if (!$data) {
                 throw new \RuntimeException('PayU payment gateway not configured');

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminSetting;
-use App\Models\PaymentConfiguration;
+use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
@@ -13,7 +13,7 @@ class AdminSettingsController extends Controller
 {
     /**
      * Get payment flow settings (UI behavior only)
-     * Note: Payment method visibility is controlled via PaymentConfiguration.is_enabled
+     * Note: Payment method visibility is controlled via PaymentMethod.is_enabled
      */
     public function getPaymentFlowSettings()
     {
@@ -21,13 +21,13 @@ class AdminSettingsController extends Controller
             $flowType = AdminSetting::get('payment_flow_type', 'two_tier');
             $defaultType = AdminSetting::get('payment_default_type', 'none');
 
-            // Check if any COD payment methods are enabled
-            $codEnabled = PaymentConfiguration::whereIn('payment_method', ['cod', 'cod_with_advance', 'cod_percentage_advance'])
+            // Check if COD payment method is enabled
+            $codEnabled = PaymentMethod::where('payment_method', 'cod')
                 ->where('is_enabled', true)
                 ->exists();
 
             // Check if any online payment methods are enabled
-            $onlinePaymentEnabled = PaymentConfiguration::whereNotIn('payment_method', ['cod', 'cod_with_advance', 'cod_percentage_advance'])
+            $onlinePaymentEnabled = PaymentMethod::where('payment_method', '!=', 'cod')
                 ->where('is_enabled', true)
                 ->exists();
 
@@ -82,12 +82,12 @@ class AdminSettingsController extends Controller
                 $updated['default_type'] = $request->default_type;
             }
 
-            // Handle COD enable/disable for all COD payment methods
+            // Handle COD enable/disable
             if ($request->has('cod_enabled')) {
                 $codEnabled = filter_var($request->cod_enabled, FILTER_VALIDATE_BOOLEAN);
 
-                // Update all COD payment configurations
-                PaymentConfiguration::whereIn('payment_method', ['cod', 'cod_with_advance', 'cod_percentage_advance'])
+                // Update COD payment method
+                PaymentMethod::where('payment_method', 'cod')
                     ->update(['is_enabled' => $codEnabled]);
 
                 $updated['cod_enabled'] = $codEnabled;
@@ -97,8 +97,8 @@ class AdminSettingsController extends Controller
             if ($request->has('online_payment_enabled')) {
                 $onlineEnabled = filter_var($request->online_payment_enabled, FILTER_VALIDATE_BOOLEAN);
 
-                // Update all online payment configurations (excluding COD methods)
-                PaymentConfiguration::whereNotIn('payment_method', ['cod', 'cod_with_advance', 'cod_percentage_advance'])
+                // Update all online payment methods (excluding COD)
+                PaymentMethod::where('payment_method', '!=', 'cod')
                     ->update(['is_enabled' => $onlineEnabled]);
 
                 $updated['online_payment_enabled'] = $onlineEnabled;

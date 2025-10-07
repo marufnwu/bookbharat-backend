@@ -5,8 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\AdminSetting;
-use App\Models\PaymentSetting;
-use App\Models\PaymentConfiguration;
+use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
@@ -360,32 +359,18 @@ class SettingsController extends Controller
 
     public function getPayment()
     {
-        // Get PaymentSettings (Gateway configurations)
-        $paymentSettings = PaymentSetting::orderBy('priority', 'asc')->get()->map(function ($setting) {
-            return [
-                'id' => $setting->id,
-                'keyword' => $setting->unique_keyword,
-                'name' => $setting->name,
-                'description' => $setting->description,
-                'is_active' => $setting->is_active,
-                'is_production' => $setting->is_production,
-                'supported_currencies' => $setting->supported_currencies,
-                'configuration' => $setting->configuration,
-                'webhook_config' => $setting->webhook_config,
-                'priority' => $setting->priority,
-                'created_at' => $setting->created_at,
-                'updated_at' => $setting->updated_at,
-            ];
-        });
-
-        // Get PaymentConfigurations (Method configurations for orders)
-        $paymentMethods = PaymentConfiguration::orderBy('priority', 'desc')->get()->map(function ($config) {
+        // Get PaymentMethods (unified payment configuration)
+        $paymentMethods = PaymentMethod::orderBy('priority', 'desc')->get()->map(function ($config) {
             return [
                 'id' => $config->id,
                 'payment_method' => $config->payment_method,
                 'display_name' => $config->display_name,
                 'description' => $config->description,
                 'is_enabled' => $config->is_enabled,
+                'is_default' => $config->is_default,
+                'is_fallback' => $config->is_fallback,
+                'is_system' => $config->is_system,
+                'is_production_mode' => $config->is_production_mode,
                 'priority' => $config->priority,
                 'configuration' => $config->configuration,
                 'restrictions' => $config->restrictions,
@@ -397,86 +382,18 @@ class SettingsController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'payment_settings' => $paymentSettings,
                 'payment_methods' => $paymentMethods,
                 'stats' => [
-                    'active_gateways' => PaymentSetting::where('is_active', true)->count(),
-                    'enabled_methods' => PaymentConfiguration::where('is_enabled', true)->count(),
-                    'production_gateways' => PaymentSetting::where('is_production', true)->count(),
+                    'total_methods' => PaymentMethod::count(),
+                    'enabled_methods' => PaymentMethod::where('is_enabled', true)->count(),
+                    'system_methods' => PaymentMethod::where('is_system', true)->count(),
                 ]
             ]
         ]);
     }
 
-    public function updatePaymentSetting(Request $request, PaymentSetting $paymentSetting)
-    {
-        $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'configuration' => 'sometimes|array',
-            'is_active' => 'sometimes|boolean',
-            'is_production' => 'sometimes|boolean',
-            'supported_currencies' => 'sometimes|array',
-            'webhook_config' => 'sometimes|array',
-            'priority' => 'sometimes|integer',
-        ]);
-
-        $paymentSetting->update($request->only([
-            'name', 'description', 'configuration', 'is_active',
-            'is_production', 'supported_currencies', 'webhook_config', 'priority'
-        ]));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Payment setting updated successfully',
-            'data' => $paymentSetting
-        ]);
-    }
-
-    public function updatePaymentConfiguration(Request $request, PaymentConfiguration $paymentConfiguration)
-    {
-        $request->validate([
-            'display_name' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'is_enabled' => 'sometimes|boolean',
-            'priority' => 'sometimes|integer',
-            'configuration' => 'sometimes|array',
-            'restrictions' => 'sometimes|array',
-        ]);
-
-        $paymentConfiguration->update($request->only([
-            'display_name', 'description', 'is_enabled',
-            'priority', 'configuration', 'restrictions'
-        ]));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Payment method updated successfully',
-            'data' => $paymentConfiguration
-        ]);
-    }
-
-    public function togglePaymentSetting(Request $request, PaymentSetting $paymentSetting)
-    {
-        $paymentSetting->update(['is_active' => !$paymentSetting->is_active]);
-
-        return response()->json([
-            'success' => true,
-            'message' => $paymentSetting->is_active ? 'Payment gateway enabled' : 'Payment gateway disabled',
-            'data' => $paymentSetting
-        ]);
-    }
-
-    public function togglePaymentConfiguration(Request $request, PaymentConfiguration $paymentConfiguration)
-    {
-        $paymentConfiguration->update(['is_enabled' => !$paymentConfiguration->is_enabled]);
-
-        return response()->json([
-            'success' => true,
-            'message' => $paymentConfiguration->is_enabled ? 'Payment method enabled' : 'Payment method disabled',
-            'data' => $paymentConfiguration
-        ]);
-    }
+    // Legacy methods removed - use PaymentMethodController instead
+    // These routes are deprecated and should use /api/v1/admin/payment-methods endpoints
 
     public function getShipping()
     {

@@ -5,7 +5,7 @@ namespace App\Services\Payment\Gateways;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\PaymentSetting;
+use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
@@ -18,11 +18,11 @@ class CashfreeGateway implements PaymentGatewayInterface
 
     public function __construct()
     {
-        $this->settings = PaymentSetting::where('unique_keyword', 'cashfree')->first();
+        $this->settings = PaymentMethod::where('payment_method', 'cashfree')->first();
         $this->config = $this->settings ? $this->settings->configuration : [];
 
         // Set base URL based on production/test mode
-        $this->baseUrl = ($this->settings && $this->settings->is_production)
+        $this->baseUrl = ($this->settings && $this->settings->is_production_mode)
             ? 'https://api.cashfree.com/pg'
             : 'https://sandbox.cashfree.com/pg';
     }
@@ -34,7 +34,7 @@ class CashfreeGateway implements PaymentGatewayInterface
 
     public function getDisplayName(): string
     {
-        return $this->settings->name ?? 'Cashfree';
+        return $this->settings->display_name ?? 'Cashfree';
     }
 
     public function getDescription(): string
@@ -44,7 +44,7 @@ class CashfreeGateway implements PaymentGatewayInterface
 
     public function isAvailable(): bool
     {
-        return $this->settings ? $this->settings->is_active : false;
+        return $this->settings ? $this->settings->is_enabled : false;
     }
 
     public function getSupportedCurrencies(): array

@@ -37,7 +37,7 @@ class PhonepeController extends Controller
     private function initializePhonepeConfig(): void
     {
         try {
-            $data = PaymentSetting::whereUniqueKeyword('phonepe')->first();
+            $data = PaymentMethod::where('payment_method',('phonepe')->first();
 
             if (!$data) {
                 throw new \RuntimeException('PhonePe payment gateway not configured');

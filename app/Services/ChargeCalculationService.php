@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\OrderCharge;
-use App\Models\PaymentConfiguration;
+use App\Models\PaymentMethod;
 
 class ChargeCalculationService
 {
@@ -58,6 +58,11 @@ class ChargeCalculationService
                 $charges[] = $gatewayCharge;
                 $totalCharges += $gatewayCharge['amount'];
             }
+
+            // Check for advance payment from PaymentMethod configuration (especially for COD)
+            if (!$advancePaymentConfig) {
+                $advancePaymentConfig = $this->getAdvancePaymentFromPaymentMethod($paymentMethod, $discountedValue);
+            }
         }
 
         $result = [
@@ -80,7 +85,7 @@ class ChargeCalculationService
      */
     protected function calculatePaymentGatewayCharge($paymentMethod, $orderValue)
     {
-        $paymentConfig = PaymentConfiguration::where('payment_method', $paymentMethod)
+        $paymentConfig = PaymentMethod::where('payment_method', $paymentMethod)
             ->where('is_enabled', true)
             ->first();
 
@@ -180,5 +185,49 @@ class ChargeCalculationService
         return array_sum(array_column(array_filter($charges, function($charge) {
             return !($charge['is_taxable'] ?? false);
         }), 'amount'));
+    }
+
+    /**
+     * Get advance payment configuration from PaymentMethod (for COD)
+     */
+    protected function getAdvancePaymentFromPaymentMethod($paymentMethod, $orderValue)
+    {
+        $paymentConfig = PaymentMethod::where('payment_method', $paymentMethod)
+            ->where('is_enabled', true)
+            ->first();
+
+        if (!$paymentConfig || !isset($paymentConfig->configuration['advance_payment'])) {
+            return null;
+        }
+
+        $advanceConfig = $paymentConfig->configuration['advance_payment'];
+
+        // If advance payment is not required, return null
+        if (!($advanceConfig['required'] ?? false)) {
+            return null;
+        }
+
+        // Calculate advance amount
+        $type = $advanceConfig['type'] ?? 'fixed';
+        $value = $advanceConfig['value'] ?? 0;
+        $amount = 0;
+
+        switch ($type) {
+            case 'percentage':
+                $amount = round(($orderValue * $value) / 100, 2);
+                break;
+            case 'fixed':
+                $amount = $value;
+                break;
+        }
+
+        return [
+            'required' => true,
+            'type' => $type,
+            'value' => $value,
+            'amount' => $amount,
+            'description' => $advanceConfig['description'] ?? 'Advance payment required',
+            'payment_method' => $paymentMethod,
+        ];
     }
 }
