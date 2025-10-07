@@ -74,4 +74,29 @@ class PaymentSetting extends Model
     {
         return data_get($this->configuration, $key, $default);
     }
+
+    /**
+     * HIERARCHICAL RELATIONSHIP: One gateway has many payment method configurations
+     * This gateway acts as a MASTER SWITCH - when disabled, all related methods are hidden
+     */
+    public function paymentConfigurations()
+    {
+        return $this->hasMany(PaymentConfiguration::class, 'payment_setting_id');
+    }
+
+    /**
+     * Check if this gateway has any enabled payment methods
+     */
+    public function hasEnabledMethods()
+    {
+        return $this->paymentConfigurations()->where('is_enabled', true)->exists();
+    }
+
+    /**
+     * Get count of enabled methods for this gateway
+     */
+    public function enabledMethodsCount()
+    {
+        return $this->paymentConfigurations()->where('is_enabled', true)->count();
+    }
 }

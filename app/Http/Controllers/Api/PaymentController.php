@@ -24,37 +24,72 @@ class PaymentController extends Controller
     }
 
     /**
-     * Get available payment gateways
+     * Get available payment methods - CLEAN SINGLE TABLE
+     *
+     * SINGLE SOURCE OF TRUTH: PaymentMethod.is_enabled
+     * - No hierarchies
+     * - No foreign keys
+     * - Simple query: WHERE is_enabled = true
      */
     public function getAvailablePaymentMethods(Request $request)
     {
         try {
             $amount = $request->query('amount', 0);
-            $currency = $request->query('currency', 'INR');
+            $orderItems = $request->query('items', []);
 
-            $gateways = PaymentGatewayFactory::getGatewaysForOrder($amount, $currency);
+            // CLEAN & SIMPLE: Get enabled methods
+            $paymentMethods = \App\Models\PaymentMethod::getEnabledMethods($amount, $orderItems);
 
-            // Get payment flow settings from AdminSetting
+            // Transform to frontend-friendly format
+            $gateways = $paymentMethods->map(function ($method) {
+                return [
+                    'id' => $method->id,
+                    'gateway' => $method->payment_method, // Frontend expects 'gateway' field
+                    'payment_method' => $method->payment_method,
+                    'display_name' => $method->display_name,
+                    'description' => $method->description,
+                    'priority' => $method->priority,
+                    'configuration' => $method->configuration,
+                    'restrictions' => $method->restrictions,
+                    'advance_payment' => $method->configuration['advance_payment'] ?? null,
+                    'service_charges' => $method->configuration['service_charges'] ?? null,
+                    'is_active' => true, // Already filtered by is_enabled
+                    'is_cod' => $method->isCod(),
+                    'is_online' => $method->isOnline(),
+                    'gateway_type' => $method->gateway_type,
+                    'is_production' => $method->is_production,
+                ];
+            })->values();
+
+            // Get payment flow settings for UI behavior only
             $paymentFlowType = \App\Models\AdminSetting::get('payment_flow_type', 'two_tier');
             $defaultPaymentType = \App\Models\AdminSetting::get('payment_default_type', 'none');
 
+            // Check if COD and online payment methods are enabled
+            $codEnabled = \App\Models\PaymentMethod::cod()->where('is_enabled', true)->exists();
+            $onlinePaymentEnabled = \App\Models\PaymentMethod::online()->where('is_enabled', true)->exists();
+
             return response()->json([
                 'success' => true,
-                'gateways' => $gateways,
+                'gateways' => $gateways, // Frontend expects 'gateways' key
+                'payment_methods' => $gateways, // Keep for backward compatibility
                 'payment_flow' => [
                     'type' => $paymentFlowType,
-                    'default_payment_type' => $defaultPaymentType
+                    'default_payment_type' => $defaultPaymentType,
+                    'cod_enabled' => $codEnabled,
+                    'online_payment_enabled' => $onlinePaymentEnabled,
                 ]
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to fetch payment methods', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch payment methods'
+                'message' => 'Failed to fetch payment methods: ' . $e->getMessage()
             ], 500);
         }
     }

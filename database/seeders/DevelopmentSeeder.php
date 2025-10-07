@@ -22,11 +22,13 @@ class DevelopmentSeeder extends Seeder
             // 1. Core System Setup
             RolePermissionSeeder::class,           // Roles & permissions
 
-            // 2. Payment Configuration
-            PaymentConfigurationSeeder::class,      // Payment gateway configurations
-            EnablePaymentGatewaysSeeder::class,     // Enable payment gateways
-            PaymentSettingSeeder::class,            // Additional payment settings
-            PaymentAdminSettingsSeeder::class,      // Admin payment settings
+            // 2. Payment Configuration (NEW CLEAN SYSTEM)
+            PaymentMethodSeeder::class,             // NEW: Clean single-table payment methods
+            // OLD SEEDERS REMOVED - Using new PaymentMethodSeeder instead
+            // PaymentConfigurationSeeder::class,   // DEPRECATED
+            // EnablePaymentGatewaysSeeder::class,  // DEPRECATED
+            // PaymentSettingSeeder::class,         // DEPRECATED
+            PaymentAdminSettingsSeeder::class,      // Admin payment settings (still needed)
 
             // 3. Shipping Configuration
             DefaultWarehouseSeeder::class,          // Default warehouse

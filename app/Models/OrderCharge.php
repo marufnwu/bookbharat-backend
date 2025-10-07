@@ -175,4 +175,54 @@ class OrderCharge extends Model
 
         return 0;
     }
+
+    /**
+     * Get advance payment configuration for COD charges
+     */
+    public function getAdvancePaymentConfig()
+    {
+        if ($this->apply_to !== 'cod_only') {
+            return null;
+        }
+
+        $conditions = $this->conditions ?? [];
+
+        if (!isset($conditions['advance_payment'])) {
+            return null;
+        }
+
+        return $conditions['advance_payment'];
+    }
+
+    /**
+     * Check if advance payment is required
+     */
+    public function requiresAdvancePayment()
+    {
+        $config = $this->getAdvancePaymentConfig();
+        return $config && ($config['required'] ?? false);
+    }
+
+    /**
+     * Calculate advance payment amount
+     */
+    public function calculateAdvancePayment($orderTotal)
+    {
+        $config = $this->getAdvancePaymentConfig();
+
+        if (!$config || !($config['required'] ?? false)) {
+            return 0;
+        }
+
+        $type = $config['type'] ?? 'percentage';
+        $value = $config['value'] ?? 0;
+
+        if ($type === 'percentage') {
+            return round(($orderTotal * $value) / 100, 2);
+        } elseif ($type === 'fixed') {
+            return round($value, 2);
+        }
+
+        return 0;
+    }
 }

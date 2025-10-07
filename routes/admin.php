@@ -26,6 +26,7 @@ use App\Http\Controllers\Admin\ProductAssociationController;
 use App\Http\Controllers\Admin\BundleDiscountRuleController;
 use App\Http\Controllers\Admin\BundleAnalyticsController;
 use App\Http\Controllers\Admin\HeroConfigController;
+use App\Http\Controllers\Admin\PaymentMethodController;
 
 /*
 |--------------------------------------------------------------------------
@@ -366,6 +367,19 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/roles', [SettingsController::class, 'createRole']);
         Route::put('/roles/{role}', [SettingsController::class, 'updateRole']);
         Route::get('/activity-logs', [SettingsController::class, 'getActivityLogs']);
+    });
+
+    // Payment Methods Management (New Clean Single Table System)
+    Route::prefix('payment-methods')->group(function () {
+        Route::get('/', [PaymentMethodController::class, 'index']);
+        Route::get('/schemas', [PaymentMethodController::class, 'getSchemas']);
+        Route::get('/gateway-status', [PaymentMethodController::class, 'getGatewayStatus']);
+        Route::get('/{id}', [PaymentMethodController::class, 'show']);
+        Route::put('/{id}', [PaymentMethodController::class, 'update']);
+        Route::post('/{id}/toggle', [PaymentMethodController::class, 'toggle']);
+        Route::post('/{id}/set-default', [PaymentMethodController::class, 'setDefault']);
+        Route::post('/{id}/set-fallback', [PaymentMethodController::class, 'setFallback']);
+        Route::delete('/{id}', [PaymentMethodController::class, 'destroy']);
     });
 
     // System Management

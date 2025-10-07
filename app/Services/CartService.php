@@ -347,7 +347,7 @@ class CartService
         }
 
         // Prepare order context for charge and tax calculation
-        $paymentMethod = request()->input('payment_method', 'online'); // Default to online payment
+        $paymentMethod = request()->input('payment_method', null); // No default - user must select
         $orderContext = [
             'payment_method' => $paymentMethod,
             'order_value' => $subtotal,

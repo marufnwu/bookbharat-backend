@@ -11,6 +11,7 @@ class PaymentConfiguration extends Model
 
     protected $fillable = [
         'payment_method',
+        'payment_setting_id',
         'is_enabled',
         'configuration',
         'restrictions',
@@ -26,9 +27,25 @@ class PaymentConfiguration extends Model
         'priority' => 'integer'
     ];
 
+    /**
+     * SINGLE SOURCE OF TRUTH: Relationship to PaymentSetting (gateway)
+     */
+    public function paymentSetting()
+    {
+        return $this->belongsTo(PaymentSetting::class, 'payment_setting_id');
+    }
+
+    /**
+     * Get enabled payment methods - ENFORCES GATEWAY MUST BE ACTIVE
+     */
     public static function getEnabledMethods($orderAmount = null, $orderItems = [])
     {
+        // CRITICAL: Only return methods where BOTH configuration AND gateway are active
         $query = self::where('is_enabled', true)
+            ->whereHas('paymentSetting', function($query) {
+                $query->where('is_active', true); // Gateway must be active!
+            })
+            ->with('paymentSetting') // Eager load for efficiency
             ->orderBy('priority', 'desc');
 
         $methods = $query->get();

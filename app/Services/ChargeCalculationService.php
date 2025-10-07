@@ -18,6 +18,7 @@ class ChargeCalculationService
 
         $charges = [];
         $totalCharges = 0;
+        $advancePaymentConfig = null;
 
         // Get applicable order charges from order_charges table
         $orderCharges = OrderCharge::getApplicableCharges($paymentMethod, $orderContext);
@@ -39,24 +40,39 @@ class ChargeCalculationService
 
                 $totalCharges += $chargeAmount;
             }
+
+            // Check for advance payment configuration (COD charges)
+            if ($paymentMethod === 'cod' && $charge->apply_to === 'cod_only') {
+                $config = $charge->getAdvancePaymentConfig();
+                if ($config && !empty($config)) {
+                    $advancePaymentConfig = $config;
+                }
+            }
         }
 
         // Get payment gateway specific charges
         if ($paymentMethod) {
             $gatewayCharge = $this->calculatePaymentGatewayCharge($paymentMethod, $discountedValue);
-            
+
             if ($gatewayCharge) {
                 $charges[] = $gatewayCharge;
                 $totalCharges += $gatewayCharge['amount'];
             }
         }
 
-        return [
+        $result = [
             'charges' => $charges,
             'total_charges' => round($totalCharges, 2),
             'taxable_charges' => round($this->getTaxableCharges($charges), 2),
             'non_taxable_charges' => round($this->getNonTaxableCharges($charges), 2),
         ];
+
+        // Add advance payment info if available
+        if ($advancePaymentConfig) {
+            $result['advance_payment'] = $advancePaymentConfig;
+        }
+
+        return $result;
     }
 
     /**
