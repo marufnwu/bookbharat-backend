@@ -41,14 +41,14 @@ use App\Http\Controllers\Admin\BundleDiscountController;
 
 // Public routes
 Route::prefix('v1')->group(function () {
-    
+
     // Authentication Routes
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-        
+
         // Protected auth routes
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
@@ -135,6 +135,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/active', [App\Http\Controllers\Api\HeroConfigController::class, 'getActive']);
         Route::get('/{variant}', [App\Http\Controllers\Api\HeroConfigController::class, 'show']);
     });
+
+    // Promotional Banners Routes (Read-only for public)
+    Route::get('/promotional-banners/active', [\App\Http\Controllers\Admin\PromotionalBannerController::class, 'getActive']);
+
+    // Homepage Layout Routes (Read-only for public)
+    Route::get('/homepage-layout/sections', [\App\Http\Controllers\Admin\HomepageLayoutController::class, 'getEnabledSections']);
 
     // Cart Routes (Public - supports both guest and authenticated users)
     Route::prefix('cart')->group(function () {

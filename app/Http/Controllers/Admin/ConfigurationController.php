@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -10,6 +11,13 @@ use App\Models\SiteConfiguration;
 
 class ConfigurationController extends Controller
 {
+    protected $auditLogService;
+
+    public function __construct(AuditLogService $auditLogService)
+    {
+        $this->auditLogService = $auditLogService;
+    }
+
     /**
      * Get site configuration for frontend
      */
@@ -394,6 +402,12 @@ class ConfigurationController extends Controller
 
             \Log::info('Validated data:', $validated);
 
+            // Get old configuration for audit log
+            $oldConfig = [];
+            foreach ($validated as $group => $config) {
+                $oldConfig[$group] = SiteConfiguration::getByGroup($group);
+            }
+
             // Update each configuration group
             foreach ($validated as $group => $config) {
                 \Log::info("Processing group: $group with config:", $config);
@@ -403,6 +417,9 @@ class ConfigurationController extends Controller
                     \Log::info("Save result:", $result->toArray());
                 }
             }
+
+            // Log configuration change
+            $this->auditLogService->logConfigChange('site', $oldConfig, $validated);
 
             // Clear the cache to force refresh
             Cache::forget('site_config');

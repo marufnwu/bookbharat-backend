@@ -27,6 +27,11 @@ use App\Http\Controllers\Admin\BundleDiscountRuleController;
 use App\Http\Controllers\Admin\BundleAnalyticsController;
 use App\Http\Controllers\Admin\HeroConfigController;
 use App\Http\Controllers\Admin\PaymentMethodController;
+use App\Http\Controllers\Admin\HomepageLayoutController;
+use App\Http\Controllers\Admin\MediaLibraryController;
+use App\Http\Controllers\Admin\PromotionalBannerController;
+use App\Http\Controllers\Admin\NewsletterController as AdminNewsletterController;
+use App\Http\Controllers\Admin\AuditLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -514,6 +519,76 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::prefix('admin-settings')->group(function () {
         Route::get('/payment-flow', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'getPaymentFlowSettings']);
         Route::put('/payment-flow', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'updatePaymentFlowSettings']);
+    });
+
+    // Homepage Layout Management
+    Route::prefix('homepage-layout')->group(function () {
+        // Sections
+        Route::get('/sections', [HomepageLayoutController::class, 'getSections']);
+        Route::get('/sections/enabled', [HomepageLayoutController::class, 'getEnabledSections']);
+        Route::post('/sections', [HomepageLayoutController::class, 'createSection']);
+        Route::put('/sections/{id}', [HomepageLayoutController::class, 'updateSection']);
+        Route::delete('/sections/{id}', [HomepageLayoutController::class, 'deleteSection']);
+        Route::post('/sections/update-order', [HomepageLayoutController::class, 'updateSectionOrder']);
+        Route::post('/sections/{id}/toggle', [HomepageLayoutController::class, 'toggleSection']);
+
+        // Section Templates
+        Route::get('/section-templates', [HomepageLayoutController::class, 'getSectionTemplates']);
+
+        // Layouts
+        Route::get('/layouts', [HomepageLayoutController::class, 'getLayouts']);
+        Route::get('/layouts/active', [HomepageLayoutController::class, 'getActiveLayout']);
+        Route::post('/layouts', [HomepageLayoutController::class, 'createLayout']);
+        Route::post('/layouts/{id}/set-active', [HomepageLayoutController::class, 'setActiveLayout']);
+        Route::delete('/layouts/{id}', [HomepageLayoutController::class, 'deleteLayout']);
+    });
+
+    // Media Library Management
+    Route::prefix('media-library')->group(function () {
+        Route::get('/', [MediaLibraryController::class, 'index']);
+        Route::get('/stats', [MediaLibraryController::class, 'getStats']);
+        Route::get('/folders', [MediaLibraryController::class, 'getFolders']);
+        Route::get('/{id}', [MediaLibraryController::class, 'show']);
+        Route::post('/upload', [MediaLibraryController::class, 'upload']);
+        Route::post('/upload-multiple', [MediaLibraryController::class, 'uploadMultiple']);
+        Route::put('/{id}', [MediaLibraryController::class, 'update']);
+        Route::delete('/{id}', [MediaLibraryController::class, 'destroy']);
+        Route::post('/bulk-delete', [MediaLibraryController::class, 'bulkDelete']);
+    });
+
+    // Promotional Banners Management
+    Route::prefix('promotional-banners')->group(function () {
+        Route::get('/', [PromotionalBannerController::class, 'index']);
+        Route::get('/{id}', [PromotionalBannerController::class, 'show']);
+        Route::post('/', [PromotionalBannerController::class, 'store']);
+        Route::put('/{id}', [PromotionalBannerController::class, 'update']);
+        Route::delete('/{id}', [PromotionalBannerController::class, 'destroy']);
+        Route::post('/{id}/toggle', [PromotionalBannerController::class, 'toggle']);
+        Route::post('/update-order', [PromotionalBannerController::class, 'updateOrder']);
+    });
+
+    // Newsletter Management
+    Route::prefix('newsletter')->group(function () {
+        // Settings
+        Route::get('/settings', [AdminNewsletterController::class, 'getSettings']);
+        Route::put('/settings', [AdminNewsletterController::class, 'updateSettings']);
+
+        // Subscribers
+        Route::get('/subscribers', [AdminNewsletterController::class, 'getSubscribers']);
+        Route::get('/subscribers/stats', [AdminNewsletterController::class, 'getStats']);
+        Route::get('/subscribers/export', [AdminNewsletterController::class, 'exportSubscribers']);
+        Route::put('/subscribers/{id}/status', [AdminNewsletterController::class, 'updateSubscriberStatus']);
+        Route::delete('/subscribers/{id}', [AdminNewsletterController::class, 'deleteSubscriber']);
+        Route::post('/subscribers/bulk-delete', [AdminNewsletterController::class, 'bulkDeleteSubscribers']);
+    });
+
+    // Audit Logs
+    Route::prefix('audit-logs')->group(function () {
+        Route::get('/', [AuditLogController::class, 'index']);
+        Route::get('/stats', [AuditLogController::class, 'stats']);
+        Route::get('/events', [AuditLogController::class, 'events']);
+        Route::get('/{id}', [AuditLogController::class, 'show']);
+        Route::post('/purge', [AuditLogController::class, 'purge']);
     });
 
 });
