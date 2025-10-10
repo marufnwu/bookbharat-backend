@@ -334,12 +334,13 @@ class CartService
                     'pickup' => $pickupPincode,
                     'delivery' => $deliveryPincode
                 ]);
-                // Fallback to flat rate
-                $shippingCost = 50;
+                // Don't charge shipping if calculation fails - will be calculated at checkout
+                $shippingCost = 0;
                 $requiresPincode = true;
             }
         } else if ($couponFreeShipping) {
             $shippingCost = 0;
+            $requiresPincode = false;
             $shippingDetails = [
                 'is_free_shipping' => true,
                 'reason' => 'Coupon provides free shipping'

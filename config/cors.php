@@ -21,14 +21,14 @@ return [
 
     'allowed_origins' => ['*'],
 
-    'allowed_origins_patterns' => ['/^http:\/\/localhost:\d+$/', '/^http:\/\/127\.0\.0\.1:\d+$/'],
+    'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Session-ID'],
+    'allowed_headers' => ['*'],
 
     'exposed_headers' => [],
 
     'max_age' => 86400,
 
-    'supports_credentials' => true,
+    'supports_credentials' => false, // Set to false when using wildcard origins
 
 ];
