@@ -10,6 +10,20 @@ return [
     'allowed_origins' => [
         "http://216.10.247.145:3000",
         "http://216.10.247.145:3001",
+
+        "http://localhost:3000/",
+        "http://localhost:3001/",
+        "http://localhost:3002/",
+        "http://localhost:3003/",
+        "http://localhost:3004/",
+        "http://localhost:3005/",
+        "http://localhost:3006/",
+        "http://localhost:3007/",
+        "http://localhost:3008/",
+        "http://localhost:3009/",
+        "http://localhost:3010/",
+        "http://localhost:3011/",
+        "http://localhost:3012/",
     ],
 
     // ✅ Allow any localhost or 127.0.0.1 on ports 3000–3010 (or adjust range)
