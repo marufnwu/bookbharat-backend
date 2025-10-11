@@ -59,7 +59,7 @@ return new class extends Migration
             $table->boolean('is_production')->default(false)->comment('Test mode (false) or Production mode (true)');
 
             // Supported currencies
-            $table->json('supported_currencies')->default('["INR"]')->comment('Array of supported currency codes');
+            $table->json('supported_currencies')->nullable()->comment('Array of supported currency codes - defaults to ["INR"]');
 
             // Webhook configuration
             $table->json('webhook_config')->nullable()->comment('Webhook URLs, secrets, and verification settings');

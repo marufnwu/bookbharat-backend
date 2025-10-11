@@ -57,6 +57,16 @@ class PaymentMethod extends Model
         'webhook_config' => 'array',
     ];
 
+    protected $attributes = [
+        'is_enabled' => true,
+        'is_system' => false,
+        'is_default' => false,
+        'is_fallback' => false,
+        'is_production' => false,
+        'priority' => 0,
+        'supported_currencies' => '["INR"]',
+    ];
+
     /**
      * Credential schemas for each gateway type
      * Defines required and optional fields for gateway configuration
