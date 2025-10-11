@@ -23,23 +23,25 @@ class ProductionSeeder extends Seeder
 
             // 2. Payment Configuration (NEW CLEAN SYSTEM)
             PaymentMethodSeeder::class,             // NEW: Clean single-table payment methods
-            // OLD SEEDERS REMOVED - Using new PaymentMethodSeeder instead
-            // PaymentConfigurationSeeder::class,   // DEPRECATED
-            // EnablePaymentGatewaysSeeder::class,  // DEPRECATED
             PaymentAdminSettingsSeeder::class,      // Admin payment settings (still needed)
 
-            // 3. Shipping Configuration
+            // 3. Tax & Order Charges
+            TaxConfigurationSeeder::class,          // GST, IGST tax configuration
+            OrderChargeSeeder::class,               // COD charges, service fees
+
+            // 4. Shipping Configuration
             DefaultWarehouseSeeder::class,          // Default warehouse location
             ShippingWeightSlabSeeder::class,        // Weight-based shipping slabs
             ShippingZoneSeeder::class,              // Shipping zones configuration
             ShippingCarrierSeeder::class,           // Carrier configurations
             ShippingInsuranceSeeder::class,         // Insurance settings
 
-            // 4. Admin Settings
+            // 5. Admin & Frontend Settings
             AdminSettingsSeeder::class,             // Core admin configurations
-            HeroConfigurationSeeder::class,          // Homepage hero section config
+            HeroConfigurationSeeder::class,         // Homepage hero section config
+            HomepageSectionSeeder::class,           // Homepage layout sections
 
-            // 5. Essential Geographic Data
+            // 6. Essential Geographic Data
             PincodeZoneSeeder::class,               // Pincode to zone mapping (limited set)
         ]);
 
