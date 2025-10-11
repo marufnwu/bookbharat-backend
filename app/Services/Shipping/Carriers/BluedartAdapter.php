@@ -355,4 +355,73 @@ class BluedartAdapter implements CarrierAdapterInterface
 
         return $statusMap[strtoupper($status)] ?? 'unknown';
     }
+
+    /**
+     * Validate Bluedart credentials
+     */
+    public function validateCredentials(): array
+    {
+        try {
+            // Check if basic credentials are provided
+            if (empty($this->config['api_key']) || empty($this->config['api_secret'])) {
+                return [
+                    'success' => false,
+                    'error' => 'License Key and Login ID are required',
+                    'details' => [
+                        'missing_credentials' => [
+                            'license_key' => empty($this->config['api_key']),
+                            'login_id' => empty($this->config['api_secret'])
+                        ]
+                    ]
+                ];
+            }
+
+            // Attempt a basic API call to validate credentials
+            // This is a placeholder - actual implementation would depend on BlueDart's API
+            $response = Http::withHeaders($this->headers)
+                ->get("{$this->baseUrl}/profile");
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                return [
+                    'success' => true,
+                    'details' => [
+                        'message' => 'Credentials validated successfully',
+                        'api_mode' => $this->config['api_mode'] ?? 'test',
+                        'endpoint_tested' => "{$this->baseUrl}/profile",
+                        'response_data' => $data
+                    ]
+                ];
+            } elseif ($response->status() === 401) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid License Key or Login ID',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/profile"
+                    ]
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'API endpoint unreachable or credentials invalid',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/profile"
+                    ]
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Network error or invalid endpoint configuration',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'endpoint_tested' => "{$this->baseUrl}/profile"
+                ]
+            ];
+        }
+    }
 }

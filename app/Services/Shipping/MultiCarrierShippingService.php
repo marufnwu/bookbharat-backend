@@ -873,6 +873,58 @@ class MultiCarrierShippingService
     }
 
     /**
+     * Validate carrier credentials
+     */
+    public function validateCarrierCredentials(ShippingCarrier $carrier): array
+    {
+        try {
+            $startTime = microtime(true);
+
+            // Get the adapter for this carrier
+            $adapter = $this->carrierFactory->make($carrier);
+
+            // Perform credential validation specific to the carrier
+            $validationResult = $adapter->validateCredentials();
+
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            if ($validationResult['success']) {
+                return [
+                    'success' => true,
+                    'response_time' => $responseTime,
+                    'details' => array_merge($validationResult['details'] ?? [], [
+                        'carrier' => $carrier->name,
+                        'endpoint_tested' => $carrier->api_endpoint,
+                        'response_time_ms' => $responseTime
+                    ])
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => $validationResult['error'] ?? 'Credential validation failed',
+                    'response_time' => $responseTime,
+                    'details' => $validationResult['details'] ?? null
+                ];
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Credential validation error', [
+                'carrier' => $carrier->name,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Validation service unavailable',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'carrier' => $carrier->name
+                ]
+            ];
+        }
+    }
+
+    /**
      * Test carrier connection
      */
     public function testCarrierConnection(ShippingCarrier $carrier): array

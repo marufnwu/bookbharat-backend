@@ -378,4 +378,86 @@ class XpressbeesAdapter implements CarrierAdapterInterface
 
         return $parsedEvents;
     }
+
+    /**
+     * Validate Xpressbees credentials
+     */
+    public function validateCredentials(): array
+    {
+        try {
+            // Check if required credentials are provided
+            if (empty($this->config['email']) || empty($this->config['password']) || empty($this->config['account_id'])) {
+                return [
+                    'success' => false,
+                    'error' => 'Email, Password, and Account ID are required',
+                    'details' => [
+                        'missing_credentials' => [
+                            'email' => empty($this->config['email']),
+                            'password' => empty($this->config['password']),
+                            'account_id' => empty($this->config['account_id'])
+                        ]
+                    ]
+                ];
+            }
+
+            // Attempt login to validate credentials
+            $response = Http::post("{$this->baseUrl}/auth/login", [
+                'email' => $this->config['email'],
+                'password' => $this->config['password']
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['token']) || isset($data['access_token'])) {
+                    return [
+                        'success' => true,
+                        'details' => [
+                            'message' => 'Credentials validated successfully',
+                            'account_id' => $this->config['account_id'],
+                            'api_mode' => $this->config['api_mode'] ?? 'test',
+                            'endpoint_tested' => "{$this->baseUrl}/auth/login"
+                        ]
+                    ];
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => 'Login successful but no access token received',
+                        'details' => [
+                            'response' => $data,
+                            'endpoint_tested' => "{$this->baseUrl}/auth/login"
+                        ]
+                    ];
+                }
+            } elseif ($response->status() === 401) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid email or password',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/auth/login"
+                    ]
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Authentication endpoint unreachable',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/auth/login"
+                    ]
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Network error or invalid endpoint configuration',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'endpoint_tested' => "{$this->baseUrl}/auth/login"
+                ]
+            ];
+        }
+    }
 }

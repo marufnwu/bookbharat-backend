@@ -393,4 +393,85 @@ class ShiprocketAdapter implements CarrierAdapterInterface
             ];
         }, $events);
     }
+
+    /**
+     * Validate Shiprocket credentials
+     */
+    public function validateCredentials(): array
+    {
+        try {
+            // Check if required credentials are provided
+            if (empty($this->config['email']) || empty($this->config['password'])) {
+                return [
+                    'success' => false,
+                    'error' => 'Email and Password are required',
+                    'details' => [
+                        'missing_credentials' => [
+                            'email' => empty($this->config['email']),
+                            'password' => empty($this->config['password'])
+                        ]
+                    ]
+                ];
+            }
+
+            // Attempt login to validate credentials
+            $response = Http::post("{$this->baseUrl}/v1/external/auth/login", [
+                'email' => $this->config['email'],
+                'password' => $this->config['password']
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['token'])) {
+                    return [
+                        'success' => true,
+                        'details' => [
+                            'message' => 'Credentials validated successfully',
+                            'company_id' => $data['company_id'] ?? null,
+                            'api_mode' => 'live', // Shiprocket only has live mode
+                            'endpoint_tested' => "{$this->baseUrl}/v1/external/auth/login"
+                        ]
+                    ];
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => 'Login successful but no access token received',
+                        'details' => [
+                            'response' => $data,
+                            'endpoint_tested' => "{$this->baseUrl}/v1/external/auth/login"
+                        ]
+                    ];
+                }
+            } elseif ($response->status() === 401) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid email or password',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/v1/external/auth/login"
+                    ]
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Authentication endpoint unreachable',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/v1/external/auth/login"
+                    ]
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Network error or invalid endpoint configuration',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'endpoint_tested' => "{$this->baseUrl}/v1/external/auth/login"
+                ]
+            ];
+        }
+    }
 }

@@ -317,4 +317,85 @@ class EcomExpressAdapter implements CarrierAdapterInterface
             ];
         }, $events);
     }
+
+    /**
+     * Validate EcomExpress credentials
+     */
+    public function validateCredentials(): array
+    {
+        try {
+            // Check if required credentials are provided
+            if (empty($this->config['username']) || empty($this->config['password'])) {
+                return [
+                    'success' => false,
+                    'error' => 'Username and Password are required',
+                    'details' => [
+                        'missing_credentials' => [
+                            'username' => empty($this->config['username']),
+                            'password' => empty($this->config['password'])
+                        ]
+                    ]
+                ];
+            }
+
+            // Attempt authentication to validate credentials
+            $response = Http::withBasicAuth(
+                $this->config['username'],
+                $this->config['password']
+            )->get("{$this->baseUrl}/profile");
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['client_code']) || isset($data['account_info'])) {
+                    return [
+                        'success' => true,
+                        'details' => [
+                            'message' => 'Credentials validated successfully',
+                            'client_code' => $data['client_code'] ?? null,
+                            'api_mode' => $this->config['api_mode'] ?? 'test',
+                            'endpoint_tested' => "{$this->baseUrl}/profile"
+                        ]
+                    ];
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => 'Authentication successful but invalid account data',
+                        'details' => [
+                            'response' => $data,
+                            'endpoint_tested' => "{$this->baseUrl}/profile"
+                        ]
+                    ];
+                }
+            } elseif ($response->status() === 401) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid username or password',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/profile"
+                    ]
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Authentication endpoint unreachable',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/profile"
+                    ]
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Network error or invalid endpoint configuration',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'endpoint_tested' => "{$this->baseUrl}/profile"
+                ]
+            ];
+        }
+    }
 }

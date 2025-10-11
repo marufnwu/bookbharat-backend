@@ -293,6 +293,9 @@ class MultiCarrierShippingController extends Controller
                 $carrier->cutoff_time = $config['cutoff_time'] ?? '17:00';
                 $carrier->weight_unit = $config['weight_unit'] ?? 'kg';
                 $carrier->dimension_unit = $config['dimension_unit'] ?? 'cm';
+
+                // Include actual credential fields from database
+                // These are the fields that can be edited by admin
                 return $carrier;
             });
 
@@ -766,6 +769,75 @@ class MultiCarrierShippingController extends Controller
     }
 
     /**
+     * Validate carrier credentials
+     */
+    public function validateCredentials(Request $request, $carrierId): JsonResponse
+    {
+        $request->validate([
+            'api_endpoint' => 'sometimes|string|url',
+            'api_key' => 'sometimes|string',
+            'api_secret' => 'sometimes|string',
+            'api_token' => 'sometimes|string',
+            'license_key' => 'sometimes|string',
+            'login_id' => 'sometimes|string',
+            'access_token' => 'sometimes|string',
+            'customer_code' => 'sometimes|string',
+            'username' => 'sometimes|string',
+            'password' => 'sometimes|string',
+            'email' => 'sometimes|email',
+            'account_id' => 'sometimes|string',
+            'client_name' => 'sometimes|string',
+            // webhook_url is developer-configured, not editable by admin
+        ]);
+
+        try {
+            $carrier = ShippingCarrier::findOrFail($carrierId);
+
+            // Create a temporary carrier instance with the new credentials for testing
+            $tempCarrier = clone $carrier;
+            $tempCarrier->fill($request->only([
+                'api_endpoint', 'api_key', 'api_secret', 'api_token', 'license_key',
+                'login_id', 'access_token', 'customer_code', 'username', 'password',
+                'email', 'account_id', 'client_name', 'webhook_url'
+            ]));
+
+            // Test the credentials using the service
+            $validationResult = $this->shippingService->validateCarrierCredentials($tempCarrier);
+
+            if ($validationResult['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Credentials validated successfully',
+                    'data' => [
+                        'carrier_id' => $carrier->id,
+                        'carrier_name' => $carrier->name,
+                        'validation_details' => $validationResult['details'] ?? null,
+                        'response_time' => $validationResult['response_time'] ?? null
+                    ]
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validationResult['error'] ?? 'Credential validation failed',
+                    'details' => $validationResult['details'] ?? null
+                ], 400);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Failed to validate carrier credentials', [
+                'error' => $e->getMessage(),
+                'carrier_id' => $carrierId
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to validate credentials',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update carrier configuration
      */
     public function updateCarrierConfig(Request $request, $carrierId): JsonResponse
@@ -776,7 +848,16 @@ class MultiCarrierShippingController extends Controller
             'api_endpoint' => 'sometimes|string|url',
             'api_key' => 'sometimes|string',
             'api_secret' => 'sometimes|string',
-            'account_id' => 'sometimes|string|nullable',
+            'api_token' => 'sometimes|string', // For Shadowfax
+            'license_key' => 'sometimes|string', // For BlueDart
+            'login_id' => 'sometimes|string', // For BlueDart
+            'access_token' => 'sometimes|string', // For DTDC
+            'customer_code' => 'sometimes|string', // For DTDC
+            'username' => 'sometimes|string', // For Ecom Express
+            'password' => 'sometimes|string', // For Xpressbees, Ecom Express, Shiprocket
+            'email' => 'sometimes|email', // For Xpressbees, Shiprocket
+            'account_id' => 'sometimes|string|nullable', // For Xpressbees
+            'client_name' => 'sometimes|string', // For Delhivery
             'webhook_url' => 'sometimes|string|url|nullable',
             'is_active' => 'sometimes|boolean',
             'is_primary' => 'sometimes|boolean',
@@ -799,7 +880,10 @@ class MultiCarrierShippingController extends Controller
             // Update carrier fields
             $carrier->fill($request->only([
                 'name', 'display_name', 'api_endpoint', 'api_key', 'api_secret',
-                'account_id', 'webhook_url', 'is_active', 'is_primary', 'test_mode',
+                'api_token', 'license_key', 'login_id', 'access_token', 'customer_code',
+                'username', 'password', 'email', 'account_id', 'client_name',
+                // webhook_url is developer-configured, not editable by admin
+                'is_active', 'is_primary', 'test_mode',
                 'priority', 'supported_services', 'features', 'supported_payment_modes',
                 'max_weight', 'max_insurance_value', 'cutoff_time', 'pickup_days',
                 'delivery_days', 'configuration'

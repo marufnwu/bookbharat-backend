@@ -69,4 +69,11 @@ interface CarrierAdapterInterface
      * @return string Label URL or content
      */
     public function printLabel(string $trackingNumber): string;
+
+    /**
+     * Validate carrier credentials
+     *
+     * @return array Validation result with success status and details
+     */
+    public function validateCredentials(): array;
 }

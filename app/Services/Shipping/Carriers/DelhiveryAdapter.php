@@ -408,4 +408,84 @@ class DelhiveryAdapter implements CarrierAdapterInterface
 
         return $events;
     }
+
+    /**
+     * Validate Delhivery credentials
+     */
+    public function validateCredentials(): array
+    {
+        try {
+            // Test the API key by making a simple authenticated request
+            $response = Http::withHeaders([
+                'Authorization' => 'Token ' . $this->apiToken,
+                'Content-Type' => 'application/json'
+            ])->get($this->baseUrl . '/api/backend/clientwarehouse/', [
+                'limit' => 1
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Check if we got valid warehouse data
+                if (isset($data['data']) && is_array($data['data'])) {
+                    return [
+                        'success' => true,
+                        'details' => [
+                            'message' => 'API key is valid and authenticated',
+                            'warehouses_count' => count($data['data']),
+                            'api_mode' => $this->config['api_mode'],
+                            'endpoint_tested' => $this->baseUrl . '/api/backend/clientwarehouse/'
+                        ]
+                    ];
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => 'API key authenticated but no warehouse data returned',
+                        'details' => [
+                            'response' => $data,
+                            'endpoint_tested' => $this->baseUrl . '/api/backend/clientwarehouse/'
+                        ]
+                    ];
+                }
+            } elseif ($response->status() === 401) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid API key or unauthorized access',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => $this->baseUrl . '/api/backend/clientwarehouse/'
+                    ]
+                ];
+            } elseif ($response->status() === 403) {
+                return [
+                    'success' => false,
+                    'error' => 'API key lacks required permissions',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => $this->baseUrl . '/api/backend/clientwarehouse/'
+                    ]
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'API endpoint unreachable or returned unexpected status',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'response_body' => $response->body(),
+                        'endpoint_tested' => $this->baseUrl . '/api/backend/clientwarehouse/'
+                    ]
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Network error or invalid endpoint configuration',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'endpoint_tested' => $this->baseUrl . '/api/backend/clientwarehouse/'
+                ]
+            ];
+        }
+    }
 }

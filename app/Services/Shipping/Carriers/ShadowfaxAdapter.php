@@ -323,4 +323,70 @@ class ShadowfaxAdapter implements CarrierAdapterInterface
             ];
         }, $events);
     }
+
+    /**
+     * Validate Shadowfax credentials
+     */
+    public function validateCredentials(): array
+    {
+        try {
+            // Test the API token by making a simple authenticated request
+            $response = Http::withHeaders($this->headers)
+                ->get("{$this->baseUrl}/merchants/profile");
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['merchant_id'])) {
+                    return [
+                        'success' => true,
+                        'details' => [
+                            'message' => 'API token is valid and authenticated',
+                            'merchant_id' => $data['merchant_id'],
+                            'api_mode' => $this->config['api_mode'] ?? 'production',
+                            'endpoint_tested' => "{$this->baseUrl}/merchants/profile"
+                        ]
+                    ];
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => 'API token authenticated but invalid merchant profile',
+                        'details' => [
+                            'response' => $data,
+                            'endpoint_tested' => "{$this->baseUrl}/merchants/profile"
+                        ]
+                    ];
+                }
+            } elseif ($response->status() === 401) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid API token or unauthorized access',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'endpoint_tested' => "{$this->baseUrl}/merchants/profile"
+                    ]
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'API endpoint unreachable or returned unexpected status',
+                    'details' => [
+                        'http_status' => $response->status(),
+                        'response_body' => $response->body(),
+                        'endpoint_tested' => "{$this->baseUrl}/merchants/profile"
+                    ]
+                ];
+            }
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Network error or invalid endpoint configuration',
+                'details' => [
+                    'exception' => $e->getMessage(),
+                    'endpoint_tested' => "{$this->baseUrl}/merchants/profile"
+                ]
+            ];
+        }
+    }
 }

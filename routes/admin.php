@@ -483,6 +483,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         // Carrier Configuration
         Route::get('/carriers/{carrier}/config', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getCarrierConfig']);
         Route::put('/carriers/{carrier}/config', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'updateCarrierConfig']);
+        Route::post('/carriers/{carrier}/validate-credentials', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'validateCredentials']);
         Route::post('/carriers/{carrier}/toggle', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'toggleCarrier']);
         Route::post('/carriers/{carrier}/test', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'testCarrier']);
         Route::delete('/carriers/{carrier}', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'deleteCarrier']);
