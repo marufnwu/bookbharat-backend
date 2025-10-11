@@ -8,7 +8,8 @@ return [
 
     // Leave empty since we're using patterns
     'allowed_origins' => [
-        "http://216.10.247.145:3000"
+        "http://216.10.247.145:3000",
+        "http://216.10.247.145:3001",
     ],
 
     // ✅ Allow any localhost or 127.0.0.1 on ports 3000–3010 (or adjust range)
