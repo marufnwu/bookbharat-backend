@@ -14,21 +14,88 @@ use App\Models\CustomerGroup;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
-class SystemTestSeeder extends Seeder
+/**
+ * System Test Data Seeder
+ *
+ * Creates comprehensive test data for development environment:
+ * - Customer groups and categories
+ * - Sample products with realistic data
+ * - Test users with proper relationships
+ * - Active coupons for testing
+ *
+ * Optimized for performance and realistic test scenarios
+ */
+class SystemTestSeeder extends BaseSeeder
 {
+    /**
+     * Maximum products to create for performance
+     */
+    private int $maxProducts = 12;
+
+    /**
+     * Maximum users to create for performance
+     */
+    private int $maxUsers = 8;
+
+    /**
+     * Image URLs for product placeholders (working URLs)
+     */
+    private array $productImages = [
+        'https://picsum.photos/400/600?random=1',
+        'https://picsum.photos/400/600?random=2',
+        'https://picsum.photos/400/600?random=3',
+        'https://picsum.photos/400/600?random=4',
+        'https://picsum.photos/400/600?random=5',
+        'https://picsum.photos/400/600?random=6',
+        'https://picsum.photos/400/600?random=7',
+        'https://picsum.photos/400/600?random=8',
+        'https://picsum.photos/400/600?random=9',
+        'https://picsum.photos/400/600?random=10',
+        'https://picsum.photos/400/600?random=11',
+        'https://picsum.photos/400/600?random=12',
+        'https://picsum.photos/400/600?random=13',
+        'https://picsum.photos/400/600?random=14',
+        'https://picsum.photos/400/600?random=15',
+        'https://picsum.photos/400/600?random=16',
+        'https://picsum.photos/400/600?random=17',
+        'https://picsum.photos/400/600?random=18',
+        'https://picsum.photos/400/600?random=19',
+        'https://picsum.photos/400/600?random=20',
+    ];
+
+    /**
+     * Run the system test seeding process
+     */
     public function run(): void
     {
-        $this->createCustomerGroups();
-        $this->createCategories();
-        $this->createProducts();
-        $this->createTestUsers();
-        $this->createCoupons();
-        // $this->createLoyaltyProgram();
-        // $this->createPromotionalCampaigns();
+        $this->command->info('📦 Creating system test data...');
+        $this->command->info("   Target: {$this->maxProducts} products, {$this->maxUsers} users");
+        $this->command->newLine();
+
+        try {
+            // Create test data in logical order
+            $this->createCustomerGroups();
+            $this->createCategories();
+            $this->createProducts();
+            $this->createTestUsers();
+            $this->createCoupons();
+
+            $this->command->info('✅ System test data created successfully!');
+
+        } catch (\Exception $e) {
+            $this->command->error('❌ System test seeding failed: ' . $e->getMessage());
+            $this->command->error('File: ' . $e->getFile() . ':' . $e->getLine());
+            throw $e;
+        }
     }
 
-    private function createCustomerGroups()
+    /**
+     * Create customer groups for testing
+     */
+    private function createCustomerGroups(): void
     {
+        $this->startProgress('Customer Groups', 3);
+
         $groups = [
             ['name' => 'Regular Customers', 'description' => 'Standard customer group'],
             ['name' => 'VIP Customers', 'description' => 'Premium customer group with special benefits'],
@@ -36,15 +103,20 @@ class SystemTestSeeder extends Seeder
         ];
 
         foreach ($groups as $group) {
-            CustomerGroup::firstOrCreate(
-                ['name' => $group['name']],
-                $group
-            );
+            $this->createOrUpdate(CustomerGroup::class, ['name' => $group['name']], $group);
+            $this->updateProgress('Customer Groups');
         }
+
+        $this->completeProgress('Customer Groups');
     }
 
-    private function createCategories()
+    /**
+     * Create categories and subcategories for testing
+     */
+    private function createCategories(): void
     {
+        $this->startProgress('Categories', 7);
+
         $categories = [
             [
                 'name' => 'Fiction',
@@ -85,73 +157,94 @@ class SystemTestSeeder extends Seeder
         ];
 
         foreach ($categories as $category) {
-            Category::firstOrCreate(
-                ['slug' => $category['slug']],
-                $category
-            );
-        }
+            $categoryModel = $this->createOrUpdate(Category::class, ['slug' => $category['slug']], $category);
+            $this->updateProgress('Categories');
 
-        // Create subcategories
-        $fictionCategory = Category::where('slug', 'fiction')->first();
-        if ($fictionCategory) {
-            Category::firstOrCreate(
-                ['slug' => 'historical-fiction'],
-                [
-                    'name' => 'Historical Fiction',
-                    'slug' => 'historical-fiction',
-                    'parent_id' => $fictionCategory->id,
-                    'description' => 'Fiction set in historical periods',
-                    'is_active' => true,
-                ]
-            );
+            // Create subcategories for Fiction
+            if ($categoryModel && $category['slug'] === 'fiction') {
+                $this->createSubcategories($categoryModel);
+            }
         }
     }
 
-    private function createProducts()
+    /**
+     * Create subcategories for a parent category
+     */
+    private function createSubcategories(Category $parentCategory): void
     {
-        $categories = Category::all();
-
-        // Use actual working placeholder images from picsum or placeholder services
-        // These are real URLs that will work for demo/test purposes
-        $bookImages = [
-            'fiction' => [
-                'https://picsum.photos/400/600?random=1',
-                'https://picsum.photos/400/600?random=2',
-                'https://picsum.photos/400/600?random=3'
+        $subcategories = [
+            [
+                'name' => 'Historical Fiction',
+                'slug' => 'historical-fiction',
+                'parent_id' => $parentCategory->id,
+                'description' => 'Fiction set in historical periods',
+                'is_active' => true,
             ],
-            'non-fiction' => [
-                'https://picsum.photos/400/600?random=4',
-                'https://picsum.photos/400/600?random=5',
-                'https://picsum.photos/400/600?random=6'
+            [
+                'name' => 'Contemporary Fiction',
+                'slug' => 'contemporary-fiction',
+                'parent_id' => $parentCategory->id,
+                'description' => 'Modern fiction and literary works',
+                'is_active' => true,
             ],
-            'mystery' => [
-                'https://picsum.photos/400/600?random=7',
-                'https://picsum.photos/400/600?random=8',
-                'https://picsum.photos/400/600?random=9'
-            ],
-            'romance' => [
-                'https://picsum.photos/400/600?random=10',
-                'https://picsum.photos/400/600?random=11',
-                'https://picsum.photos/400/600?random=12'
-            ],
-            'scifi' => [
-                'https://picsum.photos/400/600?random=13',
-                'https://picsum.photos/400/600?random=14',
-                'https://picsum.photos/400/600?random=15'
-            ],
-            'biography' => [
-                'https://picsum.photos/400/600?random=16',
-                'https://picsum.photos/400/600?random=17',
-                'https://picsum.photos/400/600?random=18'
-            ]
         ];
 
-        $products = [
+        foreach ($subcategories as $subcategory) {
+            $this->createOrUpdate(Category::class, ['slug' => $subcategory['slug']], $subcategory);
+        }
+    }
+
+    /**
+     * Create sample products with realistic data and images
+     */
+    private function createProducts(): void
+    {
+        $this->startProgress('Products', $this->maxProducts);
+
+        $categories = Category::all();
+        if ($categories->isEmpty()) {
+            $this->logError('Products', 'No categories available for product creation');
+            return;
+        }
+
+        // Realistic book data for testing
+        $productsData = $this->getProductData($categories);
+
+        foreach ($productsData as $index => $productData) {
+            if ($index >= $this->maxProducts) {
+                break; // Performance limit
+            }
+
+            $product = $this->createOrUpdate(Product::class, ['sku' => $productData['sku']], $productData);
+
+            if ($product) {
+                $this->createProductImages($product, $index);
+            }
+
+            $this->updateProgress('Products');
+        }
+
+        $this->completeProgress('Products');
+    }
+
+    /**
+     * Get realistic product data for seeding
+     */
+    private function getProductData($categories): array
+    {
+        $fictionCategory = $categories->where('slug', 'fiction')->first();
+        $nonFictionCategory = $categories->where('slug', 'non-fiction')->first();
+        $mysteryCategory = $categories->where('slug', 'mystery-thriller')->first();
+        $romanceCategory = $categories->where('slug', 'romance')->first();
+        $scifiCategory = $categories->where('slug', 'science-fiction')->first();
+        $biographyCategory = $categories->where('slug', 'biography')->first();
+
+        return [
             [
                 'name' => 'The Great Indian Novel',
                 'slug' => 'the-great-indian-novel',
                 'sku' => 'GIN001',
-                'category_id' => $categories->where('slug', 'fiction')->first()->id,
+                'category_id' => $fictionCategory?->id,
                 'description' => 'A masterpiece of Indian literature that weaves together mythology and history. Written by Shashi Tharoor, published by Penguin Books India.',
                 'short_description' => 'An epic tale of modern India through the lens of the Mahabharata.',
                 'price' => 450.00,
@@ -173,7 +266,7 @@ class SystemTestSeeder extends Seeder
                 'name' => 'Midnight\'s Children',
                 'slug' => 'midnights-children',
                 'sku' => 'MC001',
-                'category_id' => $categories->where('slug', 'fiction')->first()->id,
+                'category_id' => $fictionCategory?->id,
                 'description' => 'Salman Rushdie\'s Booker Prize-winning novel about India\'s independence and the story of Saleem Sinai.',
                 'short_description' => 'The story of Saleem Sinai and the partition of India.',
                 'price' => 599.00,
@@ -192,54 +285,10 @@ class SystemTestSeeder extends Seeder
                 ])
             ],
             [
-                'name' => 'The Mahabharata: A Modern Rendering',
-                'slug' => 'the-mahabharata-modern-rendering',
-                'sku' => 'MAH001',
-                'category_id' => $categories->where('slug', 'fiction')->first()->id,
-                'description' => 'Ramesh Menon\'s accessible retelling of the great Indian epic.',
-                'short_description' => 'The timeless epic made accessible for modern readers.',
-                'price' => 799.00,
-                'compare_price' => 999.00,
-                'cost_price' => 500.00,
-                'stock_quantity' => 25,
-                'status' => 'active',
-                'is_featured' => false,
-                'metadata' => json_encode([
-                    'author' => 'Ramesh Menon',
-                    'publisher' => 'Rupa Publications',
-                    'isbn' => '9788129108647',
-                    'publication_date' => '2006-05-01',
-                    'language' => 'English',
-                    'pages' => 890
-                ])
-            ],
-            [
-                'name' => 'The God of Small Things',
-                'slug' => 'the-god-of-small-things',
-                'sku' => 'GST001',
-                'category_id' => $categories->where('slug', 'fiction')->first()->id,
-                'description' => 'Arundhati Roy\'s Booker Prize-winning debut novel.',
-                'short_description' => 'A haunting story of love, loss, and family secrets.',
-                'price' => 399.00,
-                'compare_price' => 450.00,
-                'cost_price' => 250.00,
-                'stock_quantity' => 40,
-                'status' => 'active',
-                'is_featured' => true,
-                'metadata' => json_encode([
-                    'author' => 'Arundhati Roy',
-                    'publisher' => 'IndiaInk',
-                    'isbn' => '9780060977498',
-                    'publication_date' => '1997-04-01',
-                    'language' => 'English',
-                    'pages' => 340
-                ])
-            ],
-            [
                 'name' => 'Sapiens: A Brief History of Humankind',
                 'slug' => 'sapiens-brief-history-humankind',
                 'sku' => 'SAP001',
-                'category_id' => $categories->where('slug', 'non-fiction')->first()->id,
+                'category_id' => $nonFictionCategory?->id,
                 'description' => 'Yuval Noah Harari explores the history and impact of Homo sapiens.',
                 'short_description' => 'How humans conquered the world and what it means for our future.',
                 'price' => 650.00,
@@ -261,7 +310,7 @@ class SystemTestSeeder extends Seeder
                 'name' => 'The Alchemist',
                 'slug' => 'the-alchemist',
                 'sku' => 'ALC001',
-                'category_id' => $categories->where('slug', 'fiction')->first()->id,
+                'category_id' => $fictionCategory?->id,
                 'description' => 'Paulo Coelho\'s philosophical novel about following your dreams.',
                 'short_description' => 'A shepherd\'s journey to find his personal legend.',
                 'price' => 299.00,
@@ -283,7 +332,7 @@ class SystemTestSeeder extends Seeder
                 'name' => 'The Da Vinci Code',
                 'slug' => 'the-da-vinci-code',
                 'sku' => 'DVC001',
-                'category_id' => $categories->where('slug', 'mystery-thriller')->first()->id,
+                'category_id' => $mysteryCategory?->id,
                 'description' => 'Dan Brown\'s thriller about religious mysteries and secret societies.',
                 'short_description' => 'A symbologist uncovers a deadly secret in Paris.',
                 'price' => 499.00,
@@ -305,7 +354,7 @@ class SystemTestSeeder extends Seeder
                 'name' => 'Pride and Prejudice',
                 'slug' => 'pride-and-prejudice',
                 'sku' => 'PAP001',
-                'category_id' => $categories->where('slug', 'romance')->first()->id,
+                'category_id' => $romanceCategory?->id,
                 'description' => 'Jane Austen\'s timeless romance novel.',
                 'short_description' => 'The story of Elizabeth Bennet and Mr. Darcy.',
                 'price' => 349.00,
@@ -327,7 +376,7 @@ class SystemTestSeeder extends Seeder
                 'name' => 'Dune',
                 'slug' => 'dune',
                 'sku' => 'DUN001',
-                'category_id' => $categories->where('slug', 'science-fiction')->first()->id,
+                'category_id' => $scifiCategory?->id,
                 'description' => 'Frank Herbert\'s epic science fiction masterpiece.',
                 'short_description' => 'The desert planet Arrakis and the spice melange.',
                 'price' => 549.00,
@@ -349,7 +398,7 @@ class SystemTestSeeder extends Seeder
                 'name' => 'Steve Jobs',
                 'slug' => 'steve-jobs-biography',
                 'sku' => 'SJ001',
-                'category_id' => $categories->where('slug', 'biography')->first()->id,
+                'category_id' => $biographyCategory?->id,
                 'description' => 'Walter Isaacson\'s definitive biography of Steve Jobs.',
                 'short_description' => 'The life and innovations of Apple\'s co-founder.',
                 'price' => 699.00,
@@ -367,69 +416,125 @@ class SystemTestSeeder extends Seeder
                     'pages' => 656
                 ])
             ],
+            [
+                'name' => 'The God of Small Things',
+                'slug' => 'the-god-of-small-things',
+                'sku' => 'GST001',
+                'category_id' => $fictionCategory?->id,
+                'description' => 'Arundhati Roy\'s Booker Prize-winning debut novel.',
+                'short_description' => 'A haunting story of love, loss, and family secrets.',
+                'price' => 399.00,
+                'compare_price' => 450.00,
+                'cost_price' => 250.00,
+                'stock_quantity' => 40,
+                'status' => 'active',
+                'is_featured' => true,
+                'metadata' => json_encode([
+                    'author' => 'Arundhati Roy',
+                    'publisher' => 'IndiaInk',
+                    'isbn' => '9780060977498',
+                    'publication_date' => '1997-04-01',
+                    'language' => 'English',
+                    'pages' => 340
+                ])
+            ],
+            [
+                'name' => 'The Mahabharata: A Modern Rendering',
+                'slug' => 'the-mahabharata-modern-rendering',
+                'sku' => 'MAH001',
+                'category_id' => $fictionCategory?->id,
+                'description' => 'Ramesh Menon\'s accessible retelling of the great Indian epic.',
+                'short_description' => 'The timeless epic made accessible for modern readers.',
+                'price' => 799.00,
+                'compare_price' => 999.00,
+                'cost_price' => 500.00,
+                'stock_quantity' => 25,
+                'status' => 'active',
+                'is_featured' => false,
+                'metadata' => json_encode([
+                    'author' => 'Ramesh Menon',
+                    'publisher' => 'Rupa Publications',
+                    'isbn' => '9788129108647',
+                    'publication_date' => '2006-05-01',
+                    'language' => 'English',
+                    'pages' => 890
+                ])
+            ],
+            [
+                'name' => 'Atomic Habits',
+                'slug' => 'atomic-habits',
+                'sku' => 'AH001',
+                'category_id' => $nonFictionCategory?->id,
+                'description' => 'James Clear\'s guide to building good habits and breaking bad ones.',
+                'short_description' => 'An easy and proven way to build good habits and break bad ones.',
+                'price' => 449.00,
+                'compare_price' => 549.00,
+                'cost_price' => 320.00,
+                'stock_quantity' => 55,
+                'status' => 'active',
+                'is_featured' => false,
+                'metadata' => json_encode([
+                    'author' => 'James Clear',
+                    'publisher' => 'Avery',
+                    'isbn' => '9780735211292',
+                    'publication_date' => '2018-10-16',
+                    'language' => 'English',
+                    'pages' => 320
+                ])
+            ],
+            [
+                'name' => '1984',
+                'slug' => 'nineteen-eighty-four',
+                'sku' => 'NEF001',
+                'category_id' => $fictionCategory?->id,
+                'description' => 'George Orwell\'s dystopian masterpiece about totalitarianism.',
+                'short_description' => 'A chilling vision of a totalitarian future.',
+                'price' => 379.00,
+                'compare_price' => 429.00,
+                'cost_price' => 280.00,
+                'stock_quantity' => 42,
+                'status' => 'active',
+                'is_featured' => false,
+                'metadata' => json_encode([
+                    'author' => 'George Orwell',
+                    'publisher' => 'Secker & Warburg',
+                    'isbn' => '9780451524935',
+                    'publication_date' => '1949-06-08',
+                    'language' => 'English',
+                    'pages' => 328
+                ])
+            ],
         ];
-
-        foreach ($products as $productData) {
-            $product = Product::firstOrCreate(
-                ['sku' => $productData['sku']],
-                $productData
-            );
-
-            // Add product images if they don't exist
-            if ($product->images()->count() == 0) {
-                // Determine which image set to use based on category
-                $categorySlug = $product->category->slug ?? 'fiction';
-                $imageSet = 'fiction'; // Default
-
-                if (str_contains($categorySlug, 'fiction')) {
-                    $imageSet = 'fiction';
-                } elseif (str_contains($categorySlug, 'non-fiction')) {
-                    $imageSet = 'non-fiction';
-                } elseif (str_contains($categorySlug, 'mystery') || str_contains($categorySlug, 'thriller')) {
-                    $imageSet = 'mystery';
-                } elseif (str_contains($categorySlug, 'romance')) {
-                    $imageSet = 'romance';
-                } elseif (str_contains($categorySlug, 'science-fiction')) {
-                    $imageSet = 'scifi';
-                } elseif (str_contains($categorySlug, 'biography')) {
-                    $imageSet = 'biography';
-                }
-
-                // Get appropriate images for this book type
-                $images = $bookImages[$imageSet] ?? $bookImages['fiction'];
-
-                // Add primary image - use the storage path directly
-                $product->images()->create([
-                    'image_path' => $images[0],
-                    'alt_text' => $product->name . ' - Cover',
-                    'sort_order' => 1,
-                    'is_primary' => true
-                ]);
-
-                // Add secondary images (back cover, inside pages)
-                if (count($images) > 1) {
-                    $product->images()->create([
-                        'image_path' => $images[1],
-                        'alt_text' => $product->name . ' - Back Cover',
-                        'sort_order' => 2,
-                        'is_primary' => false
-                    ]);
-                }
-
-                if (count($images) > 2) {
-                    $product->images()->create([
-                        'image_path' => $images[2],
-                        'alt_text' => $product->name . ' - Sample Page',
-                        'sort_order' => 3,
-                        'is_primary' => false
-                    ]);
-                }
-            }
-        }
     }
 
-    private function createTestUsers()
+    /**
+     * Create product images using external URLs
+     */
+    private function createProductImages(Product $product, int $index): void
     {
+        if (!isset($this->productImages[$index])) {
+            return;
+        }
+
+        $imageUrl = $this->productImages[$index];
+
+        $this->safeExecute(function() use ($product, $imageUrl) {
+            $product->images()->create([
+                'image_path' => $imageUrl,
+                'alt_text' => $product->name . ' - Cover',
+                'sort_order' => 1,
+                'is_primary' => true
+            ]);
+        }, 'Product Images', "Failed to create image for {$product->name}");
+    }
+
+    /**
+     * Create test users with proper relationships
+     */
+    private function createTestUsers(): void
+    {
+        $this->startProgress('Test Users', $this->maxUsers);
+
         $regularGroup = CustomerGroup::where('name', 'Regular Customers')->first();
         $vipGroup = CustomerGroup::where('name', 'VIP Customers')->first();
 
@@ -445,8 +550,6 @@ class SystemTestSeeder extends Seeder
                 'gender' => 'male',
                 'is_active' => true,
                 'email_verified_at' => now(),
-                'group' => $regularGroup,
-                'role' => 'customer',
             ],
             [
                 'name' => 'Jane Smith',
@@ -459,64 +562,69 @@ class SystemTestSeeder extends Seeder
                 'gender' => 'female',
                 'is_active' => true,
                 'email_verified_at' => now(),
-                'group' => $vipGroup,
-                'role' => 'customer',
-            ],
-            [
-                'name' => 'Store Admin',
-                'first_name' => 'Store',
-                'last_name' => 'Admin',
-                'email' => 'store-admin@bookbharat.com',
-                'password' => Hash::make('admin123'),
-                'phone' => '9876543212',
-                'is_active' => true,
-                'email_verified_at' => now(),
-                'group' => null, // Admin doesn't need customer group
-                'role' => 'admin', // Assign admin role
             ],
         ];
 
-        foreach ($users as $userData) {
+        foreach ($users as $index => $userData) {
+            if ($index >= $this->maxUsers) {
+                break; // Performance limit
+            }
+
             $group = $userData['group'] ?? null;
-            $role = $userData['role'] ?? null;
+            $role = $userData['role'] ?? 'customer';
             unset($userData['group']);
-            unset($userData['role']);
 
-            $user = User::firstOrCreate(
-                ['email' => $userData['email']],
-                $userData
-            );
+            $user = $this->createOrUpdate(User::class, ['email' => $userData['email']], $userData);
 
-            // Assign role if specified
-            if ($role && !$user->hasRole($role)) {
+            if ($user) {
+                // Assign role using Spatie's permission package
                 $user->assignRole($role);
+
+                if ($group && $role === 'customer') {
+                    $user->customerGroups()->syncWithoutDetaching([$group->id]);
+                }
+
+                // Create address for customer users
+                if ($role === 'customer') {
+                    $this->createUserAddress($user);
+                }
             }
 
-            if ($group && !$user->customerGroups()->where('customer_group_id', $group->id)->exists()) {
-                $user->customerGroups()->attach($group->id);
-            }
-
-            // Create addresses for users (skip admin users)
-            if ($user->email !== 'store-admin@bookbharat.com') {
-                $user->addresses()->create([
-                    'type' => 'home',
-                    'first_name' => $user->first_name,
-                    'last_name' => $user->last_name,
-                    'phone' => $user->phone,
-                    'address_line_1' => '123 Test Street',
-                    'address_line_2' => 'Apartment 4B',
-                    'city' => 'Mumbai',
-                    'state' => 'Maharashtra',
-                    'postal_code' => '400001',
-                    'country' => 'India',
-                    'is_default' => true,
-                ]);
-            }
+            $this->updateProgress('Test Users');
         }
+
+        $this->completeProgress('Test Users');
     }
 
-    private function createCoupons()
+    /**
+     * Create address for a user
+     */
+    private function createUserAddress(User $user): void
     {
+        $this->safeExecute(function() use ($user) {
+            $user->addresses()->create([
+                'type' => 'home',
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'phone' => $user->phone,
+                'address_line_1' => '123 Test Street',
+                'address_line_2' => 'Apartment 4B',
+                'city' => 'Mumbai',
+                'state' => 'Maharashtra',
+                'postal_code' => '400001',
+                'country' => 'India',
+                'is_default' => true,
+            ]);
+        }, 'User Addresses', "Failed to create address for {$user->name}");
+    }
+
+    /**
+     * Create test coupons for various scenarios
+     */
+    private function createCoupons(): void
+    {
+        $this->startProgress('Coupons', 5);
+
         $coupons = [
             [
                 'code' => 'WELCOME10',
@@ -587,100 +695,10 @@ class SystemTestSeeder extends Seeder
         ];
 
         foreach ($coupons as $couponData) {
-            Coupon::firstOrCreate(
-                ['code' => $couponData['code']],
-                $couponData
-            );
+            $this->createOrUpdate(Coupon::class, ['code' => $couponData['code']], $couponData);
+            $this->updateProgress('Coupons');
         }
-    }
 
-    private function createLoyaltyProgram()
-    {
-        LoyaltyProgram::create([
-            'name' => 'BookBharat Rewards',
-            'description' => 'Earn points for every purchase and get amazing rewards',
-            'is_active' => true,
-            'points_per_rupee' => 1,
-            'minimum_redemption_points' => 100,
-            'point_value' => 0.10, // 10 paisa per point
-            'expiry_months' => 12,
-            'tiers' => [
-                'Bronze' => ['min_points' => 0, 'multiplier' => 1.0, 'benefits' => ['Basic rewards']],
-                'Silver' => ['min_points' => 1000, 'multiplier' => 1.2, 'benefits' => ['Priority support', '20% bonus points']],
-                'Gold' => ['min_points' => 5000, 'multiplier' => 1.5, 'benefits' => ['Free shipping', 'Early access', '50% bonus points']],
-                'Platinum' => ['min_points' => 10000, 'multiplier' => 2.0, 'benefits' => ['VIP support', 'Exclusive offers', '100% bonus points']],
-            ],
-        ]);
-    }
-
-    private function createPromotionalCampaigns()
-    {
-        $campaigns = [
-            [
-                'name' => 'Summer Reading Festival',
-                'slug' => 'summer-reading-festival',
-                'description' => 'Biggest sale of the year with amazing discounts on all books',
-                'type' => 'seasonal_offer',
-                'status' => 'active',
-                'starts_at' => now(),
-                'ends_at' => now()->addMonth(),
-                'campaign_rules' => [
-                    'coupon_type' => 'percentage',
-                    'discount_value' => 25,
-                    'min_order_amount' => 750,
-                    'auto_generate_coupons' => true,
-                    'coupon_count' => 50,
-                ],
-                'target_audience' => [
-                    'customer_groups' => [1, 2],
-                    'order_criteria' => [
-                        'min_orders' => 1,
-                    ],
-                ],
-                'banner_config' => [
-                    'title' => 'Summer Reading Festival',
-                    'subtitle' => 'Up to 25% off on all books',
-                    'background_color' => '#FF6B6B',
-                    'text_color' => '#FFFFFF',
-                ],
-                'budget_limit' => 100000.00,
-                'target_participants' => 500,
-                'target_revenue' => 500000.00,
-                'priority' => 10,
-                'auto_apply' => false,
-                'created_by' => 1,
-            ],
-            [
-                'name' => 'New Customer Welcome',
-                'slug' => 'new-customer-welcome',
-                'description' => 'Special offers for first-time customers',
-                'type' => 'loyalty_bonus',
-                'status' => 'active',
-                'starts_at' => now(),
-                'ends_at' => now()->addMonths(6),
-                'campaign_rules' => [
-                    'coupon_type' => 'percentage',
-                    'discount_value' => 15,
-                    'min_order_amount' => 300,
-                    'first_order_only' => 'yes',
-                    'usage_limit_per_customer' => 1,
-                ],
-                'target_audience' => [
-                    'order_criteria' => [
-                        'max_orders' => 0,
-                    ],
-                ],
-                'budget_limit' => 50000.00,
-                'target_participants' => 200,
-                'target_revenue' => 100000.00,
-                'priority' => 8,
-                'auto_apply' => true,
-                'created_by' => 1,
-            ],
-        ];
-
-        foreach ($campaigns as $campaignData) {
-            PromotionalCampaign::create($campaignData);
-        }
+        $this->completeProgress('Coupons');
     }
 }

@@ -7,7 +7,9 @@ return [
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
     // Leave empty since we're using patterns
-    'allowed_origins' => [],
+    'allowed_origins' => [
+        "http://216.10.247.145:3000"
+    ],
 
     // ✅ Allow any localhost or 127.0.0.1 on ports 3000–3010 (or adjust range)
     'allowed_origins_patterns' => [
