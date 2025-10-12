@@ -34,7 +34,7 @@ return [
         '#^http://127\.0\.0\.1:300\d$#', // 127.0.0.1:3000–3009
     ],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => ['*', 'x-session-id', 'X-Session-Id'],
 
     'exposed_headers' => [],
 
