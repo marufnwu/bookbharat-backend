@@ -8,6 +8,8 @@ return [
 
     // Leave empty since we're using patterns
     'allowed_origins' => [
+        "https://v2.bookbharat.com/",
+        "https://v2a.bookbharat.com/",
         "http://216.10.247.145:3000",
         "http://216.10.247.145:3001",
 
