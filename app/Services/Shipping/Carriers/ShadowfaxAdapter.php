@@ -389,4 +389,16 @@ class ShadowfaxAdapter implements CarrierAdapterInterface
             ];
         }
     }
+
+    /**
+     * Get warehouse requirement type for Shadowfax
+     * 
+     * Shadowfax accepts full pickup address
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

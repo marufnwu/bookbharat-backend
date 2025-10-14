@@ -720,6 +720,7 @@ class MultiCarrierShippingService
             'service_type' => $service->service_code,
             'pickup_address' => $pickupAddress,
             'delivery_address' => $normalizedAddress,
+            'warehouse_id' => $options['warehouse_id'] ?? null,  // Pass through for carrier-specific handling
             'package_details' => [
                 'weight' => $order->total_weight ?? 1,
                 'length' => $options['length'] ?? 30,
@@ -763,29 +764,85 @@ class MultiCarrierShippingService
      */
     protected function getPickupAddress($warehouseIdentifier = null, ShippingCarrier $carrier = null): array
     {
-        // If warehouse identifier is provided
-        if ($warehouseIdentifier) {
-            // Try numeric ID first (site warehouse)
-            if (is_numeric($warehouseIdentifier)) {
-                $warehouse = \App\Models\Warehouse::active()->find($warehouseIdentifier);
-                if ($warehouse) {
-                    Log::info('Using specified site warehouse for pickup', [
-                        'warehouse_id' => $warehouseIdentifier,
-                        'warehouse_name' => $warehouse->name
-                    ]);
-                    return $warehouse->toPickupAddress();
-                }
-            }
-
-            // If not numeric or warehouse not found, treat as carrier-registered alias
-            Log::info('Using carrier-registered pickup location', [
-                'warehouse_identifier' => $warehouseIdentifier,
-                'carrier_code' => $carrier?->code
-            ]);
-            return $this->getCarrierRegisteredPickupAddress($warehouseIdentifier, $carrier);
+        // If no warehouse specified, use default
+        if (!$warehouseIdentifier) {
+            Log::info('No warehouse specified, using default pickup address');
+            return $this->getDefaultPickupAddress();
         }
 
-        // Otherwise, use default warehouse
+        // Check carrier's warehouse requirement type
+        if ($carrier) {
+            try {
+                $adapter = $this->carrierFactory->make($carrier);
+                $requirementType = $adapter->getWarehouseRequirementType();
+
+                Log::info('Processing warehouse selection', [
+                    'warehouse_identifier' => $warehouseIdentifier,
+                    'carrier_code' => $carrier->code,
+                    'requirement_type' => $requirementType
+                ]);
+
+                switch ($requirementType) {
+                    case 'registered_id':
+                        // Carrier needs pre-registered warehouse ID (e.g., BigShip)
+                        // Return minimal data, let adapter handle it
+                        Log::info('Carrier uses registered warehouse IDs', [
+                            'warehouse_id' => $warehouseIdentifier
+                        ]);
+                        return ['warehouse_id' => $warehouseIdentifier];
+
+                    case 'registered_alias':
+                        // Carrier needs pre-registered alias/name (e.g., Ekart, Delhivery)
+                        Log::info('Carrier uses registered warehouse aliases', [
+                            'warehouse_alias' => $warehouseIdentifier
+                        ]);
+                        return $this->getCarrierRegisteredPickupAddress($warehouseIdentifier, $carrier);
+
+                    case 'full_address':
+                    default:
+                        // Carrier needs full address (e.g., Xpressbees)
+                        // Try to get from site warehouse first
+                        if (is_numeric($warehouseIdentifier)) {
+                            $warehouse = \App\Models\Warehouse::active()->find($warehouseIdentifier);
+                            if ($warehouse) {
+                                Log::info('Using site warehouse full address', [
+                                    'warehouse_id' => $warehouseIdentifier,
+                                    'warehouse_name' => $warehouse->name
+                                ]);
+                                return $warehouse->toPickupAddress();
+                            }
+                        }
+                        
+                        Log::warning('Warehouse not found, using default', [
+                            'requested_warehouse' => $warehouseIdentifier
+                        ]);
+                        return $this->getDefaultPickupAddress();
+                }
+            } catch (\Exception $e) {
+                Log::error('Error determining warehouse requirement type', [
+                    'error' => $e->getMessage(),
+                    'carrier_code' => $carrier->code
+                ]);
+            }
+        }
+
+        // Fallback: Try site warehouse by numeric ID
+        if (is_numeric($warehouseIdentifier)) {
+            $warehouse = \App\Models\Warehouse::active()->find($warehouseIdentifier);
+            if ($warehouse) {
+                Log::info('Using specified site warehouse for pickup', [
+                    'warehouse_id' => $warehouseIdentifier,
+                    'warehouse_name' => $warehouse->name
+                ]);
+                return $warehouse->toPickupAddress();
+            }
+        }
+
+        // Final fallback
+        Log::warning('Warehouse selection failed, using default pickup address', [
+            'requested_warehouse' => $warehouseIdentifier,
+            'carrier_code' => $carrier?->code
+        ]);
         return $this->getDefaultPickupAddress();
     }
 

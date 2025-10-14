@@ -704,4 +704,16 @@ class EkartAdapter implements CarrierAdapterInterface
             ];
         }, $addresses);
     }
+
+    /**
+     * Get warehouse requirement type for Ekart
+     * 
+     * Ekart requires pre-registered address aliases
+     * 
+     * @return string 'registered_alias'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'registered_alias';
+    }
 }

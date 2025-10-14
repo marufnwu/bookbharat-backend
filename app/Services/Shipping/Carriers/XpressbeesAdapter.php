@@ -460,4 +460,16 @@ class XpressbeesAdapter implements CarrierAdapterInterface
             ];
         }
     }
+
+    /**
+     * Get warehouse requirement type for Xpressbees
+     * 
+     * Xpressbees accepts full pickup address in each shipment request
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

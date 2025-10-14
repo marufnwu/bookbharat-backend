@@ -189,17 +189,71 @@ class WarehouseController extends Controller
     {
         try {
             $carrier = \App\Models\ShippingCarrier::findOrFail($carrierId);
+            $factory = app(\App\Services\Shipping\Carriers\CarrierFactory::class);
+            $adapter = $factory->make($carrier);
 
-            // Get carrier-registered pickup locations
-            $carrierService = app(\App\Services\Shipping\MultiCarrierShippingService::class);
-            $registeredLocations = $carrierService->getCarrierRegisteredPickupLocations($carrier);
+            // Determine warehouse requirement type
+            $requirementType = $adapter->getWarehouseRequirementType();
 
-            return response()->json([
-                'success' => true,
-                'data' => $registeredLocations,
-                'carrier_code' => $carrier->code
+            Log::info('Fetching warehouses for carrier', [
+                'carrier_code' => $carrier->code,
+                'requirement_type' => $requirementType
             ]);
+
+            switch ($requirementType) {
+                case 'registered_id':
+                case 'registered_alias':
+                    // Fetch pre-registered warehouses from carrier API
+                    $carrierService = app(\App\Services\Shipping\MultiCarrierShippingService::class);
+                    $registeredLocations = $carrierService->getCarrierRegisteredPickupLocations($carrier);
+
+                    return response()->json([
+                        'success' => true,
+                        'data' => $registeredLocations,
+                        'carrier_code' => $carrier->code,
+                        'requirement_type' => $requirementType,
+                        'source' => 'carrier_api',
+                        'note' => 'These are pre-registered warehouses from ' . $carrier->name
+                    ]);
+
+                case 'full_address':
+                default:
+                    // Return site warehouses from database
+                    $siteWarehouses = \App\Models\Warehouse::active()
+                        ->orderBy('is_default', 'desc')
+                        ->orderBy('name')
+                        ->get()
+                        ->map(function($warehouse) {
+                            return [
+                                'id' => $warehouse->id,
+                                'name' => $warehouse->name,
+                                'carrier_warehouse_name' => $warehouse->name,
+                                'address' => $warehouse->address_line_1,
+                                'city' => $warehouse->city,
+                                'state' => $warehouse->state,
+                                'pincode' => $warehouse->pincode,
+                                'phone' => $warehouse->phone,
+                                'is_default' => $warehouse->is_default,
+                                'is_enabled' => $warehouse->is_active,
+                                'is_registered' => true  // From database
+                            ];
+                        });
+
+                    return response()->json([
+                        'success' => true,
+                        'data' => $siteWarehouses,
+                        'carrier_code' => $carrier->code,
+                        'requirement_type' => $requirementType,
+                        'source' => 'database',
+                        'note' => 'Select site warehouse. Full address will be sent to ' . $carrier->name
+                    ]);
+            }
         } catch (\Exception $e) {
+            Log::error('Failed to fetch carrier warehouses', [
+                'carrier_id' => $carrierId,
+                'error' => $e->getMessage()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch carrier registered pickup locations',

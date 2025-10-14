@@ -76,4 +76,16 @@ interface CarrierAdapterInterface
      * @return array Validation result with success status and details
      */
     public function validateCredentials(): array;
+    
+    /**
+     * Get warehouse requirement type for this carrier
+     * 
+     * Returns one of:
+     * - 'registered_id': Carrier requires pre-registered warehouse ID (e.g., BigShip)
+     * - 'registered_alias': Carrier requires pre-registered warehouse alias/name (e.g., Ekart, Delhivery)  
+     * - 'full_address': Carrier accepts full pickup address in each request (e.g., Xpressbees)
+     *
+     * @return string 'registered_id'|'registered_alias'|'full_address'
+     */
+    public function getWarehouseRequirementType(): string;
 }

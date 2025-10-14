@@ -86,4 +86,16 @@ class RapidshypAdapter implements CarrierAdapterInterface
             'delivery_days' => 3
         ];
     }
+
+    /**
+     * Get warehouse requirement type for Rapidshyp
+     * 
+     * Rapidshyp accepts full address or hub codes
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

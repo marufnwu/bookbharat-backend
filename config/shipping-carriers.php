@@ -46,47 +46,7 @@ return [
             'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
         ],
 
-        'bluedart' => [
-            'enabled' => env('BLUEDART_ENABLED', false),
-            'code' => 'BLUEDART',
-            'name' => 'BlueDart',
-            'display_name' => 'BlueDart Express',
-            'logo_url' => 'https://www.bluedart.com/img/bluedart-logo.png',
-            'api_mode' => env('BLUEDART_MODE', 'test'),
-            'test' => [
-                'api_endpoint' => 'http://netconnect.bluedart.com/Demo/',
-                'license_key' => env('BLUEDART_TEST_LICENSE_KEY', ''),
-                'login_id' => env('BLUEDART_TEST_LOGIN_ID', ''),
-            ],
-            'live' => [
-                'api_endpoint' => 'https://netconnect.bluedart.com/Ver1.10/',
-                'license_key' => env('BLUEDART_LIVE_LICENSE_KEY', ''),
-                'login_id' => env('BLUEDART_LIVE_LOGIN_ID', ''),
-            ],
-            'features' => [
-                'tracking',
-                'cod',
-                'reverse_pickup',
-                'insurance',
-                'priority',
-            ],
-            'services' => [
-                'DOMESTIC_PRIORITY' => 'Domestic Priority',
-                'SURFACE' => 'Ground Express',
-                'APEX' => 'Apex',
-            ],
-            'product_codes' => [
-                'cod' => 'C',
-                'prepaid' => 'P',
-            ],
-            'webhook_url' => env('BLUEDART_WEBHOOK_URL', '/api/v1/shipping/webhook/bluedart'),
-            'weight_unit' => 'kg',
-            'dimension_unit' => 'cm',
-            'max_weight' => 30,
-            'max_insurance_value' => 50000,
-            'cutoff_time' => '18:00',
-            'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
-        ],
+
 
         'xpressbees' => [
             'enabled' => env('XPRESSBEES_ENABLED', false),
@@ -121,42 +81,7 @@ return [
             'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
         ],
 
-        'dtdc' => [
-            'enabled' => env('DTDC_ENABLED', false),
-            'code' => 'DTDC',
-            'name' => 'DTDC',
-            'display_name' => 'DTDC Courier',
-            'logo_url' => 'https://www.dtdc.in/img/dtdc-logo.png',
-            'api_mode' => env('DTDC_MODE', 'test'),
-            'test' => [
-                'api_endpoint' => 'https://app-staging.dtdc.com/api',
-                'access_token' => env('DTDC_TEST_ACCESS_TOKEN', ''),
-                'customer_code' => env('DTDC_TEST_CUSTOMER_CODE', ''),
-            ],
-            'live' => [
-                'api_endpoint' => 'https://app.dtdc.com/api',
-                'access_token' => env('DTDC_LIVE_ACCESS_TOKEN', ''),
-                'customer_code' => env('DTDC_LIVE_CUSTOMER_CODE', ''),
-            ],
-            'features' => [
-                'tracking',
-                'cod',
-                'reverse_pickup',
-                'insurance',
-            ],
-            'services' => [
-                'PREMIUM' => 'Premium Express',
-                'GROUND' => 'Ground Express',
-                'B2C' => 'B2C Express',
-            ],
-            'webhook_url' => env('DTDC_WEBHOOK_URL', '/api/v1/shipping/webhook/dtdc'),
-            'weight_unit' => 'kg',
-            'dimension_unit' => 'cm',
-            'max_weight' => 25,
-            'max_insurance_value' => 50000,
-            'cutoff_time' => '17:00',
-            'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-        ],
+        
 
         'ecom_express' => [
             'enabled' => env('ECOM_EXPRESS_ENABLED', false),

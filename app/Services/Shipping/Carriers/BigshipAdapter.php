@@ -40,6 +40,14 @@ class BigshipAdapter implements CarrierAdapterInterface
 
             if ($response->successful()) {
                 $data = $response->json();
+
+                // BigShip returns token in data.token format
+                if (isset($data['data']['token'])) {
+                    Log::info('BigShip authentication successful');
+                    return $data['data']['token'];
+                }
+
+                // Fallback to root level token (backward compatibility)
                 if (isset($data['token'])) {
                     Log::info('BigShip authentication successful');
                     return $data['token'];
@@ -63,27 +71,34 @@ class BigshipAdapter implements CarrierAdapterInterface
         try {
             $token = $this->getAuthToken();
 
+            $shipmentCategory = $shipment['shipment_category'] ?? 'b2c';
+
+            // Get invoice amount from either invoice_amount or order_value fields
+            $invoiceAmount = $shipment['invoice_amount'] ?? $shipment['order_value'] ?? 0;
+
+            // Get dimensions - support both individual fields and dimensions array
+            $dimensions = $shipment['dimensions'] ?? [];
+            $length = $shipment['length'] ?? $dimensions['length'] ?? 10;
+            $width = $shipment['width'] ?? $dimensions['width'] ?? 10;
+            $height = $shipment['height'] ?? $dimensions['height'] ?? 10;
+
             $payload = [
-                'shipment_category' => $shipment['shipment_category'] ?? 'b2c',
+                'shipment_category' => $shipmentCategory,
                 'payment_type' => $shipment['payment_mode'] === 'cod' ? 'COD' : 'Prepaid',
                 'pickup_pincode' => $shipment['pickup_pincode'],
                 'destination_pincode' => $shipment['delivery_pincode'],
-                'shipment_invoice_amount' => $shipment['invoice_amount'] ?? 0,
+                'shipment_invoice_amount' => $invoiceAmount,
+                'risk_type' => $shipmentCategory === 'b2b' ? ($shipment['risk_type'] ?? 'OwnerRisk') : '',
                 'box_details' => [
                     [
                         'each_box_dead_weight' => $shipment['billable_weight'] ?? $shipment['weight'] ?? 1,
-                        'each_box_length' => $shipment['length'] ?? 10,
-                        'each_box_width' => $shipment['width'] ?? 10,
-                        'each_box_height' => $shipment['height'] ?? 10,
+                        'each_box_length' => $length,
+                        'each_box_width' => $width,
+                        'each_box_height' => $height,
                         'box_count' => 1
                     ]
                 ]
             ];
-
-            // Add risk_type for B2B shipments
-            if (($shipment['shipment_category'] ?? 'b2c') === 'b2b') {
-                $payload['risk_type'] = $shipment['risk_type'] ?? 'OwnerRisk';
-            }
 
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $token,
@@ -98,8 +113,8 @@ class BigshipAdapter implements CarrierAdapterInterface
 
                     foreach ($data['data'] as $rateData) {
                         $rates[] = [
-                            'service_code' => $rateData['courier_id'] ?? 'STANDARD',
-                            'service_name' => $rateData['courier_name'] ?? 'Standard Delivery',
+                            'code' => $rateData['courier_id'] ?? 'STANDARD',  // Changed from service_code
+                            'name' => $rateData['courier_name'] ?? 'Standard Delivery',  // Changed from service_name
                             'base_charge' => $rateData['courier_charge'] ?? 0,
                             'fuel_surcharge' => 0,
                             'gst' => 0,
@@ -110,13 +125,15 @@ class BigshipAdapter implements CarrierAdapterInterface
                             'estimated_delivery_date' => now()->addDays($rateData['tat'] ?? 3)->format('Y-m-d'),
                             'courier_id' => $rateData['courier_id'] ?? null,
                             'billable_weight' => $rateData['billable_weight'] ?? 0,
-                            'zone' => $rateData['zone'] ?? null
+                            'zone' => $rateData['zone'] ?? null,
+                            'features' => ['tracking'],  // Add features array
+                            'tracking_available' => true
                         ];
                     }
 
                     return [
                         'success' => true,
-                        'rates' => $rates
+                        'services' => $rates  // Use 'services' key for consistency with MultiCarrierShippingService
                     ];
                 }
             }
@@ -130,7 +147,7 @@ class BigshipAdapter implements CarrierAdapterInterface
             return [
                 'success' => false,
                 'message' => 'Failed to fetch rates from BigShip',
-                'rates' => []
+                'services' => []
             ];
 
         } catch (\Exception $e) {
@@ -139,7 +156,7 @@ class BigshipAdapter implements CarrierAdapterInterface
             return [
                 'success' => false,
                 'message' => 'Error fetching rates: ' . $e->getMessage(),
-                'rates' => []
+                'services' => []
             ];
         }
     }
@@ -298,6 +315,7 @@ class BigshipAdapter implements CarrierAdapterInterface
                 'pickup_pincode' => $pickupPincode,
                 'destination_pincode' => $deliveryPincode,
                 'shipment_invoice_amount' => 1000,
+                'risk_type' => '', // Empty for B2C
                 'box_details' => [
                     [
                         'each_box_dead_weight' => 1,
@@ -575,5 +593,18 @@ class BigshipAdapter implements CarrierAdapterInterface
         ];
 
         return $statusMap[$bigshipStatus] ?? 'unknown';
+    }
+
+    /**
+     * Get warehouse requirement type for BigShip
+     *
+     * BigShip requires pre-registered warehouse IDs obtained from their API.
+     * Warehouses must be registered via POST /api/warehouse/add first.
+     *
+     * @return string 'registered_id'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'registered_id';
     }
 }

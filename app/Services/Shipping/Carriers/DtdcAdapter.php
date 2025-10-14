@@ -165,4 +165,16 @@ class DtdcAdapter implements CarrierAdapterInterface
             ];
         }
     }
+
+    /**
+     * Get warehouse requirement type for DTDC
+     * 
+     * DTDC accepts full pickup address details
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

@@ -398,4 +398,16 @@ class EcomExpressAdapter implements CarrierAdapterInterface
             ];
         }
     }
+
+    /**
+     * Get warehouse requirement type for EcomExpress
+     * 
+     * Ecom Express accepts full pickup address
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

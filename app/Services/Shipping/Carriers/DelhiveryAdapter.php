@@ -750,4 +750,16 @@ class DelhiveryAdapter implements CarrierAdapterInterface
             ];
         }, $warehouses);
     }
+
+    /**
+     * Get warehouse requirement type for Delhivery
+     * 
+     * Delhivery uses registered warehouse names/aliases from their portal
+     * 
+     * @return string 'registered_alias'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'registered_alias';
+    }
 }

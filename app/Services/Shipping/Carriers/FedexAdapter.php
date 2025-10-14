@@ -86,4 +86,16 @@ class FedexAdapter implements CarrierAdapterInterface
             'delivery_days' => 3
         ];
     }
+
+    /**
+     * Get warehouse requirement type for FedEx
+     * 
+     * FedEx requires full pickup address with account number
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

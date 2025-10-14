@@ -474,4 +474,16 @@ class ShiprocketAdapter implements CarrierAdapterInterface
             ];
         }
     }
+
+    /**
+     * Get warehouse requirement type for Shiprocket
+     * 
+     * Shiprocket can use full address or pre-registered pickup locations
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }

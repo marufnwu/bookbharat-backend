@@ -422,4 +422,16 @@ class BluedartAdapter implements CarrierAdapterInterface
             ];
         }
     }
+
+    /**
+     * Get warehouse requirement type for Bluedart
+     * 
+     * BlueDart uses customer code + full address
+     * 
+     * @return string 'full_address'
+     */
+    public function getWarehouseRequirementType(): string
+    {
+        return 'full_address';
+    }
 }
