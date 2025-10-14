@@ -32,6 +32,11 @@ class MultiCarrierShippingService
         $this->carriers = ShippingCarrier::where('is_active', true)
             ->orderBy('priority', 'desc')
             ->get();
+
+        Log::info('MultiCarrierShippingService: Loaded active carriers', [
+            'count' => $this->carriers->count(),
+            'carriers' => $this->carriers->pluck('name', 'code')->toArray()
+        ]);
     }
 
     /**
@@ -151,14 +156,27 @@ class MultiCarrierShippingService
         foreach ($this->carriers as $carrier) {
             // Check basic eligibility
             if (!$this->isCarrierEligible($carrier, $shipmentDetails)) {
+                Log::info("Carrier {$carrier->name} filtered out by isCarrierEligible check");
                 continue;
             }
 
             // Check pincode serviceability
-            if ($this->checkPincodeServiceability($carrier, $shipmentDetails)) {
+            $serviceable = $this->checkPincodeServiceability($carrier, $shipmentDetails);
+            Log::info("Carrier {$carrier->name} serviceability check", [
+                'serviceable' => $serviceable,
+                'pickup' => $shipmentDetails['pickup_pincode'],
+                'delivery' => $shipmentDetails['delivery_pincode']
+            ]);
+
+            if ($serviceable) {
                 $eligibleCarriers->push($carrier);
             }
         }
+
+        Log::info('Eligible carriers after all checks', [
+            'count' => $eligibleCarriers->count(),
+            'carriers' => $eligibleCarriers->pluck('name')->toArray()
+        ]);
 
         return $eligibleCarriers;
     }
@@ -219,43 +237,46 @@ class MultiCarrierShippingService
     }
 
     /**
-     * Fetch rates from multiple carriers in parallel
+     * Fetch rates from multiple carriers (synchronously for reliability)
      */
     protected function fetchRatesFromCarriers(Collection $carriers, array $shipment): Collection
     {
         $rates = collect();
 
-        // Prepare concurrent requests
-        $requests = [];
+        // Fetch rates from each carrier
         foreach ($carriers as $carrier) {
             try {
+                Log::info("Fetching rates from {$carrier->name}");
+
                 $adapter = $this->carrierFactory->make($carrier);
-                $requests[$carrier->id] = $adapter->getRateAsync($shipment);
-            } catch (\Exception $e) {
-                Log::error("Failed to prepare rate request for carrier {$carrier->name}", [
-                    'error' => $e->getMessage()
+                $carrierRatesResponse = $adapter->getRates($shipment);
+
+                Log::info("Rate response from {$carrier->name}", [
+                    'response' => $carrierRatesResponse
                 ]);
-            }
-        }
 
-        // Execute requests in parallel
-        $responses = Http::pool(fn ($pool) => $requests);
+                if (isset($carrierRatesResponse['services']) && is_array($carrierRatesResponse['services'])) {
+                    $carrierRates = $this->parseCarrierRates($carrier, $carrierRatesResponse);
+                    Log::info("Parsed rates from {$carrier->name}", [
+                        'count' => $carrierRates->count()
+                    ]);
 
-        // Process responses
-        foreach ($responses as $carrierId => $response) {
-            $carrier = $carriers->find($carrierId);
-
-            try {
-                if ($response->successful()) {
-                    $carrierRates = $this->parseCarrierRates($carrier, $response->json());
                     $rates = $rates->merge($carrierRates);
+                } else {
+                    Log::warning("No services in response from {$carrier->name}", [
+                        'response' => $carrierRatesResponse
+                    ]);
                 }
+
             } catch (\Exception $e) {
-                Log::error("Failed to parse rates from carrier {$carrier->name}", [
-                    'error' => $e->getMessage()
+                Log::error("Failed to fetch rates from carrier {$carrier->name}", [
+                    'error' => $e->getMessage(),
+                    'trace' => substr($e->getTraceAsString(), 0, 500)
                 ]);
             }
         }
+
+        Log::info("Total rates fetched", ['count' => $rates->count()]);
 
         return $rates;
     }
@@ -466,9 +487,20 @@ class MultiCarrierShippingService
     public function createShipment(Order $order, int $carrierId, string $serviceCode, array $options = []): Shipment
     {
         $carrier = ShippingCarrier::findOrFail($carrierId);
+
+        // Try to find CarrierService, but don't fail if it doesn't exist
         $service = CarrierService::where('carrier_id', $carrierId)
             ->where('service_code', $serviceCode)
-            ->firstOrFail();
+            ->first();
+
+        // If no service record exists, create a virtual service object
+        if (!$service) {
+            $service = new CarrierService();
+            $service->carrier_id = $carrierId;
+            $service->service_code = $serviceCode;
+            $service->service_name = $this->getServiceName($serviceCode);
+            $service->id = null; // Will be null for virtual services
+        }
 
         // Prepare shipment data
         $shipmentData = $this->prepareShipmentData($order, $service, $options);
@@ -481,7 +513,8 @@ class MultiCarrierShippingService
         $shipment = new Shipment();
         $shipment->order_id = $order->id;
         $shipment->carrier_id = $carrierId;
-        $shipment->carrier_service_id = $service->id;
+        $shipment->service_code = $serviceCode; // Store service code directly
+        $shipment->carrier_service_id = $service->id; // May be null if service record doesn't exist
         $shipment->tracking_number = $booking['tracking_number'];
         $shipment->carrier_tracking_id = $booking['carrier_reference'] ?? null;
         $shipment->status = 'created';
@@ -631,12 +664,20 @@ class MultiCarrierShippingService
     protected function checkServiceabilityViaAPI(ShippingCarrier $carrier, array $shipment): bool
     {
         try {
+            Log::info("Checking serviceability via API for {$carrier->name}", [
+                'pickup' => $shipment['pickup_pincode'],
+                'delivery' => $shipment['delivery_pincode'],
+                'payment_mode' => $shipment['payment_mode']
+            ]);
+
             $adapter = $this->carrierFactory->make($carrier);
             $serviceable = $adapter->checkServiceability(
                 $shipment['pickup_pincode'],
                 $shipment['delivery_pincode'],
                 $shipment['payment_mode']
             );
+
+            Log::info("Serviceability API result for {$carrier->name}: " . ($serviceable ? 'TRUE' : 'FALSE'));
 
             // Cache the result
             DB::table('carrier_pincode_serviceability')->updateOrInsert(
@@ -655,7 +696,8 @@ class MultiCarrierShippingService
             return $serviceable;
         } catch (\Exception $e) {
             Log::warning("Serviceability check failed for carrier {$carrier->name}", [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => substr($e->getTraceAsString(), 0, 500)
             ]);
             return false;
         }
@@ -666,11 +708,18 @@ class MultiCarrierShippingService
      */
     protected function prepareShipmentData(Order $order, CarrierService $service, array $options): array
     {
+        // Normalize shipping address to carrier format
+        $shippingAddress = is_array($order->shipping_address) ? $order->shipping_address : $order->shipping_address->toArray();
+        $normalizedAddress = $this->normalizeAddress($shippingAddress);
+
+        // Get pickup address from warehouse or default
+        $pickupAddress = $this->getPickupAddress($options['warehouse_id'] ?? null, $service->carrier);
+
         return [
             'order_id' => $order->order_number,
             'service_type' => $service->service_code,
-            'pickup_address' => $options['pickup_address'] ?? $this->getDefaultPickupAddress(),
-            'delivery_address' => is_array($order->shipping_address) ? $order->shipping_address : $order->shipping_address->toArray(),
+            'pickup_address' => $pickupAddress,
+            'delivery_address' => $normalizedAddress,
             'package_details' => [
                 'weight' => $order->total_weight ?? 1,
                 'length' => $options['length'] ?? 30,
@@ -678,18 +727,66 @@ class MultiCarrierShippingService
                 'height' => $options['height'] ?? 10,
                 'value' => $order->total_amount,
                 'description' => $options['description'] ?? 'Books',
-                'quantity' => $order->items->count()
+                'quantity' => $order->orderItems->count()
             ],
             'payment_mode' => $order->payment_method === 'cod' ? 'cod' : 'prepaid',
             'cod_amount' => $order->payment_method === 'cod' ? $order->total_amount : 0,
             'insurance' => $options['insurance'] ?? false,
             'fragile' => $options['fragile'] ?? false,
             'customer_details' => [
-                'name' => $order->customer_name,
-                'email' => $order->customer_email,
-                'phone' => $order->customer_phone
+                'name' => $normalizedAddress['name'],
+                'email' => $order->user->email ?? 'customer@example.com',
+                'phone' => $normalizedAddress['phone']
             ]
         ];
+    }
+
+    /**
+     * Normalize address format for carrier APIs
+     */
+    protected function normalizeAddress(array $address): array
+    {
+        return [
+            'name' => trim(($address['first_name'] ?? '') . ' ' . ($address['last_name'] ?? '')),
+            'phone' => $address['phone'] ?? $address['whatsapp_number'] ?? '',
+            'address_1' => $address['address_1'] ?? $address['address_line_1'] ?? $address['house_number'] ?? '',
+            'address_2' => $address['address_2'] ?? $address['address_line_2'] ?? $address['landmark'] ?? '',
+            'city' => $address['city'] ?? '',
+            'state' => $address['state'] ?? '',
+            'pincode' => $address['pincode'] ?? $address['postal_code'] ?? '',
+            'country' => $address['country'] ?? 'India'
+        ];
+    }
+
+    /**
+     * Get pickup address from warehouse ID or default
+     */
+    protected function getPickupAddress($warehouseIdentifier = null, ShippingCarrier $carrier = null): array
+    {
+        // If warehouse identifier is provided
+        if ($warehouseIdentifier) {
+            // Try numeric ID first (site warehouse)
+            if (is_numeric($warehouseIdentifier)) {
+                $warehouse = \App\Models\Warehouse::active()->find($warehouseIdentifier);
+                if ($warehouse) {
+                    Log::info('Using specified site warehouse for pickup', [
+                        'warehouse_id' => $warehouseIdentifier,
+                        'warehouse_name' => $warehouse->name
+                    ]);
+                    return $warehouse->toPickupAddress();
+                }
+            }
+
+            // If not numeric or warehouse not found, treat as carrier-registered alias
+            Log::info('Using carrier-registered pickup location', [
+                'warehouse_identifier' => $warehouseIdentifier,
+                'carrier_code' => $carrier?->code
+            ]);
+            return $this->getCarrierRegisteredPickupAddress($warehouseIdentifier, $carrier);
+        }
+
+        // Otherwise, use default warehouse
+        return $this->getDefaultPickupAddress();
     }
 
     /**
@@ -697,15 +794,48 @@ class MultiCarrierShippingService
      */
     protected function getDefaultPickupAddress(): array
     {
+        // Try to get default warehouse from database
+        $warehouse = \App\Models\Warehouse::active()->default()->first();
+
+        if ($warehouse) {
+            Log::info('Using default warehouse for pickup', [
+                'warehouse_name' => $warehouse->name
+            ]);
+            return $warehouse->toPickupAddress();
+        }
+
+        // Fallback to config if no warehouse exists
+        Log::warning('No warehouse found, using config fallback');
         return [
             'name' => config('shipping.pickup.name', 'BookBharat Warehouse'),
-            'address_1' => config('shipping.pickup.address_1'),
+            'contact_person' => config('shipping.pickup.contact_person', 'Warehouse Manager'),
+            'phone' => config('shipping.pickup.phone', '9876543210'),
+            'email' => config('shipping.pickup.email'),
+            'address_1' => config('shipping.pickup.address_1', '123, Book Street'),
             'address_2' => config('shipping.pickup.address_2'),
-            'city' => config('shipping.pickup.city'),
-            'state' => config('shipping.pickup.state'),
-            'pincode' => config('shipping.pickup.pincode'),
-            'phone' => config('shipping.pickup.phone')
+            'city' => config('shipping.pickup.city', 'New Delhi'),
+            'state' => config('shipping.pickup.state', 'Delhi'),
+            'pincode' => config('shipping.pickup.pincode', '110001'),
+            'country' => config('shipping.pickup.country', 'India')
         ];
+    }
+
+    /**
+     * Get service name from service code
+     */
+    protected function getServiceName(string $serviceCode): string
+    {
+        $serviceNames = [
+            'SURFACE' => 'Surface Delivery',
+            'EXPRESS' => 'Express Delivery',
+            'AIR' => 'Air Delivery',
+            'STANDARD' => 'Standard Delivery',
+            'PRIORITY' => 'Priority Delivery',
+            'ECONOMY' => 'Economy Delivery',
+            'OVERNIGHT' => 'Overnight Delivery',
+        ];
+
+        return $serviceNames[strtoupper($serviceCode)] ?? ucfirst(strtolower($serviceCode)) . ' Service';
     }
 
     /**
@@ -992,5 +1122,192 @@ class MultiCarrierShippingService
                 'response_time' => round((microtime(true) - microtime(true)) * 1000, 2)
             ];
         }
+    }
+
+    /**
+     * Get carrier-registered pickup locations
+     */
+    public function getCarrierRegisteredPickupLocations(ShippingCarrier $carrier): array
+    {
+        try {
+            $adapter = $this->carrierFactory->make($carrier);
+
+            // Call the appropriate method based on carrier
+            if (method_exists($adapter, 'getRegisteredWarehouses')) {
+                $result = $adapter->getRegisteredWarehouses();
+            } elseif (method_exists($adapter, 'getRegisteredAddresses')) {
+                $result = $adapter->getRegisteredAddresses();
+            } else {
+                // Fallback to site warehouses if carrier doesn't support registered addresses
+                return $this->getFallbackWarehouses($carrier);
+            }
+
+            if ($result['success'] ?? false) {
+                // Get raw warehouse/address data
+                $rawData = $result['warehouses'] ?? $result['addresses'] ?? [];
+
+                // Use carrier-specific normalization
+                $normalizedWarehouses = [];
+                if (method_exists($adapter, 'normalizeRegisteredWarehouses')) {
+                    // Delhivery format
+                    $normalizedWarehouses = $adapter->normalizeRegisteredWarehouses($rawData);
+                } elseif (method_exists($adapter, 'normalizeRegisteredAddresses')) {
+                    // Ekart format
+                    $normalizedWarehouses = $adapter->normalizeRegisteredAddresses($rawData);
+                } else {
+                    // Fallback for carriers without normalization methods
+                    $normalizedWarehouses = array_map(function($warehouse) use ($carrier) {
+                        return [
+                            'id' => $warehouse['id'] ?? $warehouse['alias'] ?? $warehouse['name'] ?? null,
+                            'name' => $warehouse['alias'] ?? $warehouse['name'] ?? $warehouse['registered_name'] ?? 'Unknown',
+                            'carrier_warehouse_name' => $warehouse['carrier_warehouse_name'] ?? $warehouse['alias'] ?? $warehouse['name'],
+                            'address' => $warehouse['address'] ?? $warehouse['address_line1'] ?? $warehouse['registered_name'] ?? '',
+                            'city' => $warehouse['city'] ?? '',
+                            'pincode' => $warehouse['pincode'] ?? $warehouse['pin'] ?? '',
+                            'phone' => $warehouse['phone'] ?? $warehouse['registered_phone'] ?? '',
+                            'is_enabled' => $warehouse['is_enabled'] ?? true,
+                            'carrier_code' => $carrier->code,
+                            'is_registered' => true
+                        ];
+                    }, $rawData);
+                }
+
+                return $normalizedWarehouses;
+            }
+
+            // If API call failed, return empty array with note
+            return [];
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get carrier registered pickup locations', [
+                'carrier_id' => $carrier->id,
+                'carrier_code' => $carrier->code,
+                'error' => $e->getMessage()
+            ]);
+
+            // Return fallback warehouses on error
+            return $this->getFallbackWarehouses($carrier);
+        }
+    }
+
+    /**
+     * Get carrier-registered pickup address by alias
+     */
+    protected function getCarrierRegisteredPickupAddress(string $alias, ShippingCarrier $carrier = null): array
+    {
+        if (!$carrier) {
+            Log::warning('No carrier provided for registered pickup address lookup, using default');
+            return $this->getDefaultPickupAddress();
+        }
+
+        try {
+            $adapter = $this->carrierFactory->make($carrier);
+
+            // Get normalized registered locations using carrier-specific logic
+            $normalizedLocations = $this->getCarrierNormalizedPickupLocations($adapter, $carrier);
+
+            // Find matching location by name or alias
+            foreach ($normalizedLocations as $location) {
+                if (($location['name'] ?? '') === $alias ||
+                    ($location['carrier_warehouse_name'] ?? '') === $alias ||
+                    ($location['id'] ?? '') === $alias) {
+
+                    Log::info('Found matching carrier-registered pickup location', [
+                        'alias' => $alias,
+                        'location' => $location
+                    ]);
+
+                    return $this->normalizeAddress([
+                        'name' => $location['name'] ?? 'BookBharat Warehouse',
+                        'address_1' => $location['address'] ?? '',
+                        'address_2' => '',
+                        'city' => $location['city'] ?? '',
+                        'state' => '',
+                        'pincode' => $location['pincode'] ?? '',
+                        'phone' => $location['phone'] ?? '',
+                        'country' => 'India'
+                    ]);
+                }
+            }
+
+            Log::warning('Carrier-registered pickup location not found, using default', [
+                'alias' => $alias,
+                'carrier_code' => $carrier->code
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get carrier-registered pickup address', [
+                'alias' => $alias,
+                'carrier_code' => $carrier->code,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        // Fallback to default
+        return $this->getDefaultPickupAddress();
+    }
+
+    /**
+     * Get normalized pickup locations from carrier adapter
+     */
+    protected function getCarrierNormalizedPickupLocations($adapter, ShippingCarrier $carrier): array
+    {
+        // Call the appropriate method based on carrier
+        if (method_exists($adapter, 'getRegisteredWarehouses')) {
+            $result = $adapter->getRegisteredWarehouses();
+            if ($result['success'] ?? false) {
+                $rawData = $result['warehouses'] ?? [];
+                return method_exists($adapter, 'normalizeRegisteredWarehouses')
+                    ? $adapter->normalizeRegisteredWarehouses($rawData)
+                    : $rawData;
+            }
+        } elseif (method_exists($adapter, 'getRegisteredAddresses')) {
+            $result = $adapter->getRegisteredAddresses();
+            if ($result['success'] ?? false) {
+                $rawData = $result['addresses'] ?? [];
+                return method_exists($adapter, 'normalizeRegisteredAddresses')
+                    ? $adapter->normalizeRegisteredAddresses($rawData)
+                    : $rawData;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Get fallback site warehouses when carrier doesn't support registered addresses
+     */
+    protected function getFallbackWarehouses(ShippingCarrier $carrier): array
+    {
+        $mappings = DB::table('carrier_warehouse')
+            ->where('carrier_id', $carrier->id)
+            ->join('warehouses', 'warehouses.id', '=', 'carrier_warehouse.warehouse_id')
+            ->select(
+                'warehouses.id',
+                'warehouses.name',
+                'carrier_warehouse.carrier_warehouse_name',
+                'warehouses.address_1',
+                'warehouses.city',
+                'warehouses.pincode',
+                'warehouses.phone',
+                'carrier_warehouse.is_enabled'
+            )
+            ->where('carrier_warehouse.is_enabled', true)
+            ->get();
+
+        return $mappings->map(function($mapping) use ($carrier) {
+            return [
+                'id' => $mapping->id,
+                'name' => $mapping->name,
+                'carrier_warehouse_name' => $mapping->carrier_warehouse_name ?? $mapping->name,
+                'address' => $mapping->address_1,
+                'city' => $mapping->city,
+                'pincode' => $mapping->pincode,
+                'phone' => $mapping->phone,
+                'is_enabled' => $mapping->is_enabled,
+                'carrier_code' => $carrier->code,
+                'is_registered' => false
+            ];
+        })->toArray();
     }
 }

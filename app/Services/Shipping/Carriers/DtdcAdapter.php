@@ -57,7 +57,7 @@ class DtdcAdapter implements CarrierAdapterInterface
         ];
     }
 
-    public function cancelShipment(string $awbNumber): array
+    public function cancelShipment(string $trackingNumber): bool
     {
         return [
             'success' => true,

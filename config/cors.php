@@ -1,24 +1,59 @@
 <?php
 
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Laravel CORS Options
+    |--------------------------------------------------------------------------
+    |
+    | The allowed_methods and allowed_headers options are case-insensitive.
+    |
+    | You don't need to provide both allowed_origins and allowed_origins_patterns.
+    | If one of the strings passed matches, it is considered a valid origin.
+    |
+    | If array('*') is provided to allowed_methods, allowed_origins or allowed_headers
+    | all methods / origins / headers are allowed.
+    |
+    */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    /*
+     * You can enable CORS for 1 or multiple paths.
+     * Example: ['api/*']
+     */
+    'paths' => ['api/*'],
 
-    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    /*
+    * Matches the request method. `[*]` allows all methods.
+    */
+    'allowed_methods' => ['*'],
 
-    // Allow ALL origins (disables CORS restrictions)
+    /*
+     * Matches the request origin. `[*]` allows all origins.
+     */
     'allowed_origins' => ['*'],
 
-    // Leave empty since we're allowing all origins
+    /*
+     * Matches the request origin with, similar to `Request::is()`
+     */
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*', 'x-session-id', 'X-Session-Id'],
+    /*
+     * Sets the Access-Control-Allow-Headers response header. `[*]` allows all headers.
+     */
+    'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    /*
+     * Sets the Access-Control-Expose-Headers response header.
+     */
+    'exposed_headers' => false,
 
-    'max_age' => 86400,
+    /*
+     * Sets the Access-Control-Max-Age response header.
+     */
+    'max_age' => false,
 
-    // ✅ Must be true if using cookies / Sanctum / sessions
+    /*
+     * Sets the Access-Control-Allow-Credentials header.
+     */
     'supports_credentials' => true,
 ];
-

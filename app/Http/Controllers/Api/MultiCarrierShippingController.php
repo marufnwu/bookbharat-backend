@@ -94,6 +94,7 @@ class MultiCarrierShippingController extends Controller
             'carrier_id' => 'required|exists:shipping_carriers,id',
             'service_code' => 'required|string',
             'shipping_cost' => 'required|numeric|min:0',
+            'warehouse_id' => 'nullable|string', // Can be numeric ID or carrier-registered alias
             'expected_delivery_date' => 'nullable|date',
             'schedule_pickup' => 'nullable|boolean',
             'insurance' => 'nullable|boolean',
@@ -283,9 +284,11 @@ class MultiCarrierShippingController extends Controller
                 ->orderBy('name', 'asc')
                 ->get();
 
-            // Transform to include config data
+            // Transform to include config data and flatten credentials
             $carriers->transform(function ($carrier) {
-                $config = json_decode($carrier->config, true) ?? [];
+                $config = is_array($carrier->config) ? $carrier->config : json_decode($carrier->config, true) ?? [];
+
+                // Flatten config data
                 $carrier->features = $config['features'] ?? [];
                 $carrier->services = $config['services'] ?? [];
                 $carrier->pickup_days = $config['pickup_days'] ?? [];
@@ -294,8 +297,17 @@ class MultiCarrierShippingController extends Controller
                 $carrier->weight_unit = $config['weight_unit'] ?? 'kg';
                 $carrier->dimension_unit = $config['dimension_unit'] ?? 'cm';
 
-                // Include actual credential fields from database
-                // These are the fields that can be edited by admin
+                // Include credential field structure (defines what fields admin can edit)
+                $carrier->credential_fields = $config['credential_fields'] ?? [];
+
+                // Flatten credentials from config.credentials to carrier root level for frontend
+                // This makes it easier for frontend to read/write credentials
+                if (isset($config['credentials']) && is_array($config['credentials'])) {
+                    foreach ($config['credentials'] as $key => $value) {
+                        $carrier->{$key} = $value;
+                    }
+                }
+
                 return $carrier;
             });
 
@@ -795,11 +807,30 @@ class MultiCarrierShippingController extends Controller
 
             // Create a temporary carrier instance with the new credentials for testing
             $tempCarrier = clone $carrier;
+
+            // Update basic fields
             $tempCarrier->fill($request->only([
-                'api_endpoint', 'api_key', 'api_secret', 'api_token', 'license_key',
-                'login_id', 'access_token', 'customer_code', 'username', 'password',
-                'email', 'account_id', 'client_name', 'webhook_url'
+                'api_endpoint', 'api_key', 'api_secret', 'client_name'
             ]));
+
+            // Get current config and update credentials
+            $config = is_array($tempCarrier->config) ? $tempCarrier->config : json_decode($tempCarrier->config, true) ?? [];
+
+            // Get predefined credential fields for this carrier
+            $credentialFieldStructure = $config['credential_fields'] ?? [];
+            $allowedCredentialKeys = array_column($credentialFieldStructure, 'key');
+
+            // Update credentials from request
+            if (!empty($allowedCredentialKeys)) {
+                foreach ($allowedCredentialKeys as $fieldKey) {
+                    if ($request->has($fieldKey)) {
+                        $config['credentials'][$fieldKey] = $request->input($fieldKey);
+                    }
+                }
+            }
+
+            // Set updated config
+            $tempCarrier->config = $config;
 
             // Test the credentials using the service
             $validationResult = $this->shippingService->validateCarrierCredentials($tempCarrier);
@@ -877,17 +908,49 @@ class MultiCarrierShippingController extends Controller
         try {
             $carrier = ShippingCarrier::findOrFail($carrierId);
 
-            // Update carrier fields
+            // Get current config
+            $config = is_array($carrier->config) ? $carrier->config : (is_string($carrier->config) ? json_decode($carrier->config, true) : []) ?? [];
+
+            // Update basic carrier fields (keep for backward compatibility)
             $carrier->fill($request->only([
-                'name', 'display_name', 'api_endpoint', 'api_key', 'api_secret',
-                'api_token', 'license_key', 'login_id', 'access_token', 'customer_code',
-                'username', 'password', 'email', 'account_id', 'client_name',
-                // webhook_url is developer-configured, not editable by admin
-                'is_active', 'is_primary', 'test_mode',
+                'name', 'display_name', 'api_endpoint', 'api_key', 'api_secret', 'client_name',
+                'is_active', 'is_primary',
                 'priority', 'supported_services', 'features', 'supported_payment_modes',
                 'max_weight', 'max_insurance_value', 'cutoff_time', 'pickup_days',
-                'delivery_days', 'configuration'
+                'delivery_days'
             ]));
+
+            // Handle test_mode boolean → api_mode string conversion
+            if ($request->has('test_mode')) {
+                $carrier->api_mode = $request->boolean('test_mode') ? 'test' : 'live';
+            }
+
+            // Update config JSON fields
+            if ($request->has('cutoff_time')) {
+                $config['cutoff_time'] = $request->input('cutoff_time');
+            }
+
+            // Get predefined credential fields for this carrier
+            // Admin can ONLY update these fields, not add new ones
+            $credentialFieldStructure = $config['credential_fields'] ?? [];
+            $allowedCredentialKeys = array_column($credentialFieldStructure, 'key');
+
+            // Update only the ALLOWED credential fields
+            if (!empty($allowedCredentialKeys)) {
+                foreach ($allowedCredentialKeys as $fieldKey) {
+                    if ($request->has($fieldKey)) {
+                        $config['credentials'][$fieldKey] = $request->input($fieldKey);
+
+                        // Also set on model for backward compatibility (if column exists)
+                        if (in_array($fieldKey, ['api_key', 'api_secret', 'client_name'])) {
+                            $carrier->{$fieldKey} = $request->input($fieldKey);
+                        }
+                    }
+                }
+            }
+
+            // Save updated config
+            $carrier->config = $config;
 
             // If setting as primary, unset other carriers as primary
             if ($request->has('is_primary') && $request->is_primary) {
@@ -897,6 +960,17 @@ class MultiCarrierShippingController extends Controller
 
             $carrier->save();
 
+            // Refresh carrier to get updated data
+            $carrier->refresh();
+
+            // Flatten credentials for frontend response (same as getCarriers)
+            $responseCarrier = $carrier->toArray();
+            if (isset($config['credentials']) && is_array($config['credentials'])) {
+                foreach ($config['credentials'] as $key => $value) {
+                    $responseCarrier[$key] = $value;
+                }
+            }
+
             Log::info('Carrier configuration updated', [
                 'carrier_id' => $carrierId,
                 'updated_fields' => array_keys($request->all())
@@ -905,7 +979,7 @@ class MultiCarrierShippingController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Carrier configuration updated successfully',
-                'data' => $carrier
+                'data' => $responseCarrier
             ]);
 
         } catch (\Exception $e) {
@@ -991,7 +1065,7 @@ class MultiCarrierShippingController extends Controller
 
             // Transform config data for display
             $carriers->transform(function ($carrier) {
-                $config = json_decode($carrier->config, true) ?? [];
+                $config = is_array($carrier->config) ? $carrier->config : (is_string($carrier->config) ? json_decode($carrier->config, true) : []) ?? [];
                 $carrier->features = $config['features'] ?? [];
                 $carrier->services = $config['services'] ?? [];
                 $carrier->pickup_days = $config['pickup_days'] ?? [];

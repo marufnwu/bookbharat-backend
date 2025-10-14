@@ -17,9 +17,9 @@ class XpressbeesAdapter implements CarrierAdapterInterface
     public function __construct(array $config)
     {
         $this->config = $config;
-        $this->baseUrl = $config['api_mode'] === 'production'
-            ? 'https://ship.xpressbees.com/api'
-            : 'https://shipuat.xpressbees.com/api';
+        // Use api_endpoint from config if provided, otherwise default to production
+        // Note: Xpressbees doesn't have a separate UAT endpoint in their documentation
+        $this->baseUrl = $config['api_endpoint'] ?? 'https://shipment.xpressbees.com/api';
         $this->email = $config['api_key'] ?? $config['email'];
         $this->password = $config['api_secret'] ?? $config['password'];
         $this->authenticate();

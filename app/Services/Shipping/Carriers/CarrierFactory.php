@@ -102,7 +102,11 @@ class CarrierFactory
 
         // If config file exists, merge with database settings
         if ($fileConfig) {
-            return array_merge($fileConfig, [
+            // Get credentials from config.credentials
+            $dbConfig = $carrier->config;
+            $credentials = $dbConfig['credentials'] ?? [];
+
+            $mergedConfig = array_merge($fileConfig, [
                 'carrier_id' => $carrier->id,
                 'is_active' => $carrier->is_active,
                 'is_primary' => $carrier->is_primary,
@@ -110,7 +114,17 @@ class CarrierFactory
                 'api_endpoint' => !empty($carrier->api_endpoint) ? $carrier->api_endpoint : $fileConfig['api_endpoint'],
                 'api_key' => !empty($carrier->api_key) ? $this->decryptValue($carrier->api_key) : $fileConfig['api_key'],
                 'api_secret' => !empty($carrier->api_secret) ? $this->decryptValue($carrier->api_secret) : $fileConfig['api_secret'],
+                'api_mode' => $carrier->api_mode ?? ($fileConfig['api_mode'] ?? 'test'),
             ]);
+
+            // Merge credentials from config.credentials (new structure)
+            foreach ($credentials as $key => $value) {
+                if (!empty($value)) {
+                    $mergedConfig[$key] = $this->decryptValue($value);
+                }
+            }
+
+            return $mergedConfig;
         }
 
         // Fallback to pure database config (for backward compatibility)

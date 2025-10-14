@@ -17,8 +17,8 @@ class BluedartAdapter implements CarrierAdapterInterface
         $this->config = $config;
         $this->baseUrl = $config['api_endpoint'] ?? 'https://api.bluedart.com/v1';
         $this->headers = [
-            'LicenseKey' => $config['api_key'] ?? '',
-            'LoginID' => $config['api_secret'] ?? '',
+            'LicenseKey' => $config['license_key'] ?? $config['api_key'] ?? '',
+            'LoginID' => $config['login_id'] ?? $config['api_secret'] ?? '',
             'Content-Type' => 'application/json',
         ];
     }
@@ -205,41 +205,39 @@ class BluedartAdapter implements CarrierAdapterInterface
         }
     }
 
-    public function cancelShipment(string $awbNumber): array
+    public function cancelShipment(string $trackingNumber): bool
     {
         try {
             // BlueDart specific cancellation logic
             if ($this->config['api_mode'] === 'test') {
-                return [
-                    'success' => true,
-                    'message' => 'Shipment cancelled successfully',
-                    'awb_number' => $awbNumber
-                ];
+                Log::info('BlueDart shipment cancelled (test mode)', [
+                    'tracking_number' => $trackingNumber
+                ]);
+                return true;
             }
 
             $response = Http::withHeaders($this->headers)
-                ->delete($this->baseUrl . '/shipments/' . $awbNumber);
+                ->delete($this->baseUrl . '/shipments/' . $trackingNumber);
 
             if ($response->successful()) {
-                return [
-                    'success' => true,
-                    'message' => 'Shipment cancelled successfully',
-                    'awb_number' => $awbNumber
-                ];
-            } else {
-                throw new \Exception('Cancellation request failed');
+                Log::info('BlueDart shipment cancelled successfully', [
+                    'tracking_number' => $trackingNumber
+                ]);
+                return true;
             }
+
+            Log::warning('BlueDart cancellation request failed', [
+                'tracking_number' => $trackingNumber,
+                'response' => $response->body()
+            ]);
+            return false;
 
         } catch (\Exception $e) {
             Log::error('BlueDart shipment cancellation failed', [
                 'error' => $e->getMessage(),
-                'awb_number' => $awbNumber
+                'tracking_number' => $trackingNumber
             ]);
-
-            return [
-                'success' => false,
-                'error' => $e->getMessage()
-            ];
+            return false;
         }
     }
 

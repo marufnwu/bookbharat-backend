@@ -493,7 +493,16 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/bulk-create', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkCreateShipments']);
         Route::post('/bulk-cancel', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkCancelShipments']);
         Route::get('/bulk-track', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'bulkTrackShipments']);
+
+        // Warehouse-specific endpoints
+        Route::get('/carriers/{carrier}/warehouses', [\App\Http\Controllers\Api\WarehouseController::class, 'getCarrierWarehouses']);
+        Route::put('/carriers/{carrier}/warehouses/{warehouse}', [\App\Http\Controllers\Api\WarehouseController::class, 'updateCarrierWarehouse']);
+        Route::get('/carriers/{carrier}/registered-addresses', [\App\Http\Controllers\Api\WarehouseController::class, 'getRegisteredAddresses']);
+        Route::post('/carriers/{carrier}/warehouses/{warehouse}/register', [\App\Http\Controllers\Api\WarehouseController::class, 'registerWarehouseWithCarrier']);
     });
+
+    // Warehouse Management
+    Route::apiResource('warehouses', \App\Http\Controllers\Api\WarehouseController::class);
 
     // Order Charges Management
     Route::prefix('order-charges')->group(function () {

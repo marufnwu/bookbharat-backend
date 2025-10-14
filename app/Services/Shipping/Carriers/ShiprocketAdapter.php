@@ -224,7 +224,7 @@ class ShiprocketAdapter implements CarrierAdapterInterface
         }
     }
 
-    public function cancelShipment(string $trackingNumber): array
+    public function cancelShipment(string $trackingNumber): bool
     {
         try {
             // Shiprocket requires order ID for cancellation, not AWB
@@ -235,22 +235,22 @@ class ShiprocketAdapter implements CarrierAdapterInterface
                 ]);
 
             if ($response->successful()) {
-                return [
-                    'success' => true,
-                    'message' => 'Shipment cancellation initiated',
-                ];
+                Log::info('Shiprocket shipment cancelled successfully', [
+                    'tracking_number' => $trackingNumber
+                ]);
+                return true;
             }
 
-            return [
-                'success' => false,
-                'error' => $response->json()['message'] ?? 'Cancellation failed',
-            ];
+            Log::warning('Shiprocket cancellation failed', [
+                'tracking_number' => $trackingNumber,
+                'response' => $response->json()
+            ]);
+            return false;
         } catch (\Exception $e) {
-            Log::error('Shiprocket cancellation error: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-            ];
+            Log::error('Shiprocket cancellation error: ' . $e->getMessage(), [
+                'tracking_number' => $trackingNumber
+            ]);
+            return false;
         }
     }
 

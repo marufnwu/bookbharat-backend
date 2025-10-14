@@ -159,7 +159,7 @@ class EcomExpressAdapter implements CarrierAdapterInterface
         }
     }
 
-    public function cancelShipment(string $trackingNumber): array
+    public function cancelShipment(string $trackingNumber): bool
     {
         try {
             $response = Http::withHeaders($this->headers)

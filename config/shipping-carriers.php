@@ -247,6 +247,34 @@ return [
             'cutoff_time' => '17:00',
             'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
         ],
+
+        'ekart' => [
+            'enabled' => env('EKART_ENABLED', false),
+            'code' => 'EKART',
+            'name' => 'Ekart',
+            'display_name' => 'Ekart Logistics',
+            'logo_url' => 'https://storage.googleapis.com/fs.goswift.in/site/ekart_logo.png',
+            'api_mode' => env('EKART_MODE', 'live'), // Ekart only has live mode
+            'live' => [
+                'api_endpoint' => 'https://app.elite.ekartlogistics.in',
+                'client_id' => env('EKART_CLIENT_ID', ''),
+                'username' => env('EKART_USERNAME', ''),
+                'password' => env('EKART_PASSWORD', ''),
+            ],
+            'features' => ['tracking', 'cod', 'reverse_pickup', 'insurance', 'serviceability_check'],
+            'services' => [
+                'SURFACE' => 'Surface Delivery',
+                'EXPRESS' => 'Express Delivery',
+            ],
+            'webhook_url' => env('EKART_WEBHOOK_URL', '/api/v1/shipping/webhook/ekart'),
+            'weight_unit' => 'kg',
+            'dimension_unit' => 'cm',
+            'max_weight' => 50,
+            'max_insurance_value' => 100000,
+            'cutoff_time' => '17:00',
+            'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+            'supported_payment_modes' => ['prepaid', 'cod'],
+        ],
     ],
 
     /*

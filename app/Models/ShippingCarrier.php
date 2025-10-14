@@ -21,6 +21,23 @@ class ShippingCarrier extends Model
         'api_secret',
         'client_name',
         'webhook_url',
+        // Additional credential fields for different carriers
+        'email',
+        'password',
+        'username',
+        'client_id',
+        'access_key',
+        'account_id',
+        'license_key',
+        'login_id',
+        'access_token',
+        'customer_code',
+        'api_token',
+        // Token caching fields
+        'cached_token',
+        'token_expires_at',
+        'last_token_refresh',
+        // Other fields
         'supported_services',
         'features',
         'supported_payment_modes',
@@ -60,7 +77,7 @@ class ShippingCarrier extends Model
         'restricted_pincodes' => 'array',
         'pickup_locations' => 'array',
         'return_address' => 'array',
-        'config' => 'array',
+        // 'config' => 'array', // Removed - using custom accessor instead
         'is_active' => 'boolean',
         'is_primary' => 'boolean',
         'auto_generate_labels' => 'boolean',
@@ -136,6 +153,51 @@ class ShippingCarrier extends Model
     }
 
     /**
+     * Get config as array (force JSON decode if needed)
+     * Handles both single and double-encoded JSON for backward compatibility
+     */
+    public function getConfigAttribute()
+    {
+        $value = $this->attributes['config'] ?? null;
+
+        if (is_null($value)) {
+            return [];
+        }
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        // First decode
+        $decoded = json_decode($value, true);
+
+        // Handle double-encoded JSON (backward compatibility)
+        if (is_string($decoded)) {
+            $decoded = json_decode($decoded, true);
+        }
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Set config as JSON (force JSON encode if needed)
+     */
+    public function setConfigAttribute($value)
+    {
+        if (is_null($value)) {
+            $this->attributes['config'] = null;
+            return;
+        }
+
+        if (is_string($value)) {
+            $this->attributes['config'] = $value;
+            return;
+        }
+
+        $this->attributes['config'] = json_encode($value);
+    }
+
+    /**
      * Get decrypted API key
      */
     public function getApiKeyAttribute($value)
@@ -173,6 +235,65 @@ class ShippingCarrier extends Model
         // In production, encrypt this value
         // $this->attributes['api_secret'] = encrypt($value);
         $this->attributes['api_secret'] = $value;
+    }
+
+    /**
+     * Get a credential from config JSON, with fallback to direct column
+     */
+    public function getCredential(string $key, $default = null)
+    {
+        // First check config->credentials
+        if (isset($this->config['credentials'][$key])) {
+            return $this->config['credentials'][$key];
+        }
+
+        // Fallback to direct column (backward compatibility)
+        if (isset($this->attributes[$key])) {
+            return $this->attributes[$key];
+        }
+
+        return $default;
+    }
+
+    /**
+     * Get all credentials as array (useful for API calls)
+     */
+    public function getCredentials(): array
+    {
+        $credentials = $this->config['credentials'] ?? [];
+
+        // Merge with direct columns for backward compatibility
+        $directFields = ['api_key', 'api_secret', 'client_name'];
+        foreach ($directFields as $field) {
+            if (!empty($this->attributes[$field]) && !isset($credentials[$field])) {
+                $credentials[$field] = $this->attributes[$field];
+            }
+        }
+
+        return $credentials;
+    }
+
+    /**
+     * Get credentials suitable for API response (with sensitive data masked)
+     */
+    public function getCredentialsForDisplay(): array
+    {
+        $credentials = $this->getCredentials();
+        $sensitiveFields = ['api_key', 'api_secret', 'password', 'access_token', 'api_token', 'license_key'];
+
+        foreach ($sensitiveFields as $field) {
+            if (isset($credentials[$field]) && !empty($credentials[$field])) {
+                // Show first 4 and last 4 characters only
+                $value = $credentials[$field];
+                if (strlen($value) > 8) {
+                    $credentials[$field] = substr($value, 0, 4) . '...' . substr($value, -4);
+                } else {
+                    $credentials[$field] = '****';
+                }
+            }
+        }
+
+        return $credentials;
     }
 
     /**
