@@ -177,8 +177,9 @@ class ShippingCarrierSeeder extends Seeder
             ],
 
             'BIGSHIP' => [
-                ['key' => 'api_key', 'label' => 'API Key', 'type' => 'password', 'required' => true, 'description' => 'BigShip API Key'],
-                ['key' => 'api_secret', 'label' => 'API Secret', 'type' => 'password', 'required' => true, 'description' => 'BigShip API Secret'],
+                ['key' => 'username', 'label' => 'Username', 'type' => 'text', 'required' => true, 'description' => 'BigShip Login Username'],
+                ['key' => 'password', 'label' => 'Password', 'type' => 'password', 'required' => true, 'description' => 'BigShip Login Password'],
+                ['key' => 'access_key', 'label' => 'Access Key', 'type' => 'password', 'required' => true, 'description' => 'BigShip Access Key'],
             ],
 
             'RAPIDSHYP' => [

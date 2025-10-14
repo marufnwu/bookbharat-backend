@@ -275,6 +275,36 @@ return [
             'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
             'supported_payment_modes' => ['prepaid', 'cod'],
         ],
+
+        'bigship' => [
+            'enabled' => env('BIGSHIP_ENABLED', true),
+            'code' => 'BIGSHIP',
+            'name' => 'BigShip',
+            'display_name' => 'BigShip Logistics',
+            'logo_url' => 'https://www.bigship.in/img/logo.png',
+            'api_mode' => env('BIGSHIP_MODE', 'live'), // BigShip only has live mode
+            'live' => [
+                'api_endpoint' => 'https://api.bigship.in/api',
+                'username' => env('BIGSHIP_USERNAME', ''),
+                'password' => env('BIGSHIP_PASSWORD', ''),
+                'access_key' => env('BIGSHIP_ACCESS_KEY', ''),
+            ],
+            'features' => ['tracking', 'cod', 'reverse_pickup', 'insurance', 'warehouse_management', 'b2b_support'],
+            'services' => [
+                'STANDARD' => 'Standard Delivery',
+                'EXPRESS' => 'Express Delivery',
+                'SURFACE' => 'Surface Delivery',
+            ],
+            'webhook_url' => env('BIGSHIP_WEBHOOK_URL', '/api/v1/shipping/webhook/bigship'),
+            'weight_unit' => 'kg',
+            'dimension_unit' => 'cm',
+            'max_weight' => 50,
+            'max_insurance_value' => 50000,
+            'cutoff_time' => '17:00',
+            'pickup_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+            'supported_payment_modes' => ['prepaid', 'cod'],
+            'supported_shipment_categories' => ['b2c', 'b2b'],
+        ],
     ],
 
     /*
