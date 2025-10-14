@@ -110,11 +110,20 @@ class MultiCarrierShippingController extends Controller
         try {
             $order = Order::findOrFail($validated['order_id']);
 
-            // Check if shipment already exists
-            if ($order->shipment) {
+            // Check if an active shipment already exists
+            $existingShipment = Shipment::where('order_id', $order->id)
+                ->whereNotIn('status', ['cancelled', 'failed'])
+                ->first();
+
+            if ($existingShipment) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Shipment already exists for this order'
+                    'message' => 'Active shipment already exists for this order. Please cancel it first to create a new one.',
+                    'existing_shipment' => [
+                        'id' => $existingShipment->id,
+                        'tracking_number' => $existingShipment->tracking_number,
+                        'status' => $existingShipment->status
+                    ]
                 ], 400);
             }
 
@@ -128,7 +137,7 @@ class MultiCarrierShippingController extends Controller
 
             // Update order status
             $order->status = 'processing';
-            $order->shipping_cost = $validated['shipping_cost'];
+            $order->shipping_amount = $validated['shipping_cost'];
             $order->save();
 
             DB::commit();
@@ -202,6 +211,152 @@ class MultiCarrierShippingController extends Controller
             Log::error('Failed to cancel shipment', [
                 'error' => $e->getMessage(),
                 'shipment_id' => $shipmentId
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel shipment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get shipment for an order
+     */
+    public function getOrderShipment($orderId): JsonResponse
+    {
+        try {
+            $order = Order::findOrFail($orderId);
+            $shipment = Shipment::where('order_id', $orderId)
+                ->with('carrier')
+                ->first();
+
+            if (!$shipment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No shipment found for this order'
+                ], 404);
+            }
+
+            // Get service name if available
+            $serviceName = $shipment->service_code;
+            if ($shipment->carrier_service_id) {
+                $carrierService = \App\Models\CarrierService::find($shipment->carrier_service_id);
+                if ($carrierService) {
+                    $serviceName = $carrierService->service_name ?? $carrierService->name ?? $shipment->service_code;
+                }
+            }
+
+            // Fetch live tracking data from carrier API
+            $trackingData = null;
+            try {
+                if ($shipment->tracking_number && $shipment->status !== 'cancelled') {
+                    $tracking = $this->shippingService->trackShipment($shipment);
+                    if ($tracking['success'] ?? false) {
+                        $trackingData = [
+                            'status' => $tracking['status'] ?? $shipment->status,
+                            'status_description' => $tracking['status_description'] ?? '',
+                            'current_location' => $tracking['current_location'] ?? '',
+                            'events' => $tracking['events'] ?? []
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to fetch tracking data for shipment', [
+                    'shipment_id' => $shipment->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'shipment' => [
+                    'id' => $shipment->id,
+                    'order_id' => $shipment->order_id,
+                    'tracking_number' => $shipment->tracking_number,
+                    'carrier_tracking_id' => $shipment->carrier_tracking_id,
+                    'status' => $shipment->status,
+                    'carrier' => [
+                        'id' => $shipment->carrier->id,
+                        'name' => $shipment->carrier->name,
+                        'code' => $shipment->carrier->code
+                    ],
+                    'service_code' => $shipment->service_code,
+                    'service_name' => $serviceName,
+                    'shipping_cost' => $shipment->shipping_cost,
+                    'weight' => $shipment->weight,
+                    'dimensions' => $shipment->dimensions,
+                    'pickup_date' => $shipment->pickup_date,
+                    'expected_delivery_date' => $shipment->expected_delivery_date,
+                    'actual_delivery_date' => $shipment->actual_delivery_date,
+                    'label_url' => $shipment->label_url,
+                    'invoice_url' => $shipment->invoice_url,
+                    'cancelled_at' => $shipment->cancelled_at,
+                    'cancellation_reason' => $shipment->cancellation_reason,
+                    'created_at' => $shipment->created_at,
+                    'updated_at' => $shipment->updated_at,
+                    'tracking' => $trackingData
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get order shipment', [
+                'error' => $e->getMessage(),
+                'order_id' => $orderId
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get shipment details',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Cancel shipment by order ID
+     */
+    public function cancelOrderShipment($orderId): JsonResponse
+    {
+        try {
+            $order = Order::findOrFail($orderId);
+            $shipment = Shipment::where('order_id', $orderId)->first();
+
+            if (!$shipment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No shipment found for this order'
+                ], 404);
+            }
+
+            if ($shipment->status === 'cancelled') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Shipment is already cancelled'
+                ], 400);
+            }
+
+            if (in_array($shipment->status, ['delivered'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot cancel delivered shipment'
+                ], 400);
+            }
+
+            // Try to cancel with carrier
+            $result = $this->shippingService->cancelShipment($shipment);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipment cancelled successfully',
+                'shipment_id' => $shipment->id
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to cancel order shipment', [
+                'error' => $e->getMessage(),
+                'order_id' => $orderId
             ]);
 
             return response()->json([

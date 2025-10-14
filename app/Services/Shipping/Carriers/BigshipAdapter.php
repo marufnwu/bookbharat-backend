@@ -169,29 +169,45 @@ class BigshipAdapter implements CarrierAdapterInterface
         try {
             $token = $this->getAuthToken();
 
-            // Get warehouse details
+            // Get warehouse ID - BigShip requires pre-registered warehouse ID
             $pickupAddress = $data['pickup_address'] ?? [];
-            $warehouses = $this->getRegisteredWarehouses();
+            $warehouseId = $data['warehouse_id'] ?? ($pickupAddress['warehouse_id'] ?? null);
 
-            if ($warehouses['success'] && !empty($warehouses['warehouses'])) {
-                // Find warehouse by ID or use first available
-                $warehouseId = $data['warehouse_id'] ?? null;
-                $warehouse = null;
+            Log::info('BigShip createShipment', [
+                'warehouse_id' => $warehouseId,
+                'order_id' => $data['order_id'] ?? null
+            ]);
 
-                if ($warehouseId) {
-                    foreach ($warehouses['warehouses'] as $wh) {
-                        if (($wh['warehouse_id'] ?? $wh['id']) == $warehouseId) {
-                            $warehouse = $wh;
-                            break;
-                        }
-                    }
-                }
+            // Ensure warehouse ID is provided
+            if (!$warehouseId) {
+                throw new \Exception('Warehouse ID is required for BigShip shipments. Please select a registered warehouse.');
+            }
 
-                if (!$warehouse) {
-                    $warehouse = $warehouses['warehouses'][0]; // Use first warehouse
-                }
+            // Split name into first and last (BigShip requires both, last must be 3-25 chars)
+            $fullName = $data['delivery_address']['name'] ?? 'Customer Name';
+            $nameParts = explode(' ', trim($fullName), 2);
+            $firstName = $nameParts[0] ?? 'Customer';
+            $lastName = $nameParts[1] ?? 'Name'; // Default last name if not provided
 
-                $warehouseId = $warehouse['warehouse_id'] ?? null;
+            // Ensure last name meets minimum length
+            if (strlen($lastName) < 3) {
+                $lastName = 'Name'; // Default 4-char last name
+            }
+            if (strlen($lastName) > 25) {
+                $lastName = substr($lastName, 0, 25);
+            }
+
+            // Ensure address_line1 is 10-50 characters
+            $addressLine1 = $data['delivery_address']['address_1'] ?? '';
+            if (strlen($addressLine1) < 10) {
+                // Pad with address_2 or city if too short
+                $addressLine1 .= ', ' . ($data['delivery_address']['city'] ?? 'India');
+            }
+            if (strlen($addressLine1) < 10) {
+                $addressLine1 = str_pad($addressLine1, 10, ' '); // Pad to minimum
+            }
+            if (strlen($addressLine1) > 50) {
+                $addressLine1 = substr($addressLine1, 0, 50);
             }
 
             $payload = [
@@ -201,52 +217,59 @@ class BigshipAdapter implements CarrierAdapterInterface
                     'return_location_id' => $warehouseId
                 ],
                 'consignee_detail' => [
-                    'first_name' => $data['delivery_address']['name'] ?? 'Unknown',
-                    'last_name' => '',
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
                     'company_name' => '',
                     'contact_number_primary' => $data['delivery_address']['phone'] ?? '',
                     'contact_number_secondary' => '',
                     'email_id' => '',
                     'consignee_address' => [
-                        'address_line1' => $data['delivery_address']['address_1'] ?? '',
+                        'address_line1' => $addressLine1,
                         'address_line2' => $data['delivery_address']['address_2'] ?? '',
                         'address_landmark' => '',
                         'pincode' => $data['delivery_address']['pincode'] ?? ''
                     ]
-                ],
-                'order_detail' => [
-                    'invoice_date' => now()->toISOString(),
-                    'invoice_id' => $data['order_id'] ?? uniqid('INV'),
-                    'payment_type' => $data['payment_mode'] === 'cod' ? 'COD' : 'Prepaid',
-                    'shipment_invoice_amount' => $data['package_details']['value'] ?? 0,
-                    'total_collectable_amount' => $data['cod_amount'] ?? 0,
-                    'box_details' => [
-                        [
-                            'each_box_dead_weight' => $data['package_details']['weight'] ?? 1,
-                            'each_box_length' => $data['package_details']['length'] ?? 10,
-                            'each_box_width' => $data['package_details']['width'] ?? 10,
-                            'each_box_height' => $data['package_details']['height'] ?? 10,
-                            'each_box_invoice_amount' => $data['package_details']['value'] ?? 0,
-                            'each_box_collectable_amount' => $data['cod_amount'] ?? 0,
-                            'box_count' => $data['package_details']['quantity'] ?? 1,
-                            'product_details' => [
-                                [
-                                    'product_category' => 'Others',
-                                    'product_sub_category' => 'Books',
-                                    'product_name' => 'Books',
-                                    'product_quantity' => $data['package_details']['quantity'] ?? 1,
-                                    'each_product_invoice_amount' => $data['package_details']['value'] ?? 0,
-                                    'each_product_collectable_amount' => $data['cod_amount'] ?? 0,
-                                    'hsn' => ''
-                                ]
+                ]
+            ];
+
+            // Ensure invoice_id is max 25 characters (BigShip requirement)
+            $invoiceId = $data['order_id'] ?? uniqid('INV');
+            if (strlen($invoiceId) > 25) {
+                $invoiceId = substr($invoiceId, -25); // Take last 25 characters
+            }
+
+            $payload['order_detail'] = [
+                'invoice_date' => now()->toISOString(),
+                'invoice_id' => $invoiceId,
+                'payment_type' => $data['payment_mode'] === 'cod' ? 'COD' : 'Prepaid',
+                'shipment_invoice_amount' => $data['package_details']['value'] ?? 0,
+                'total_collectable_amount' => $data['cod_amount'] ?? 0,
+                'box_details' => [
+                    [
+                        'each_box_dead_weight' => $data['package_details']['weight'] ?? 1,
+                        'each_box_length' => $data['package_details']['length'] ?? 10,
+                        'each_box_width' => $data['package_details']['width'] ?? 10,
+                        'each_box_height' => $data['package_details']['height'] ?? 10,
+                        'each_box_invoice_amount' => $data['package_details']['value'] ?? 0,
+                        'each_box_collectable_amount' => $data['cod_amount'] ?? 0,
+                        'box_count' => $data['package_details']['quantity'] ?? 1,
+                        'product_details' => [
+                            [
+                                'product_category' => 'Others',
+                                'product_sub_category' => 'Books',
+                                'product_name' => 'Books',
+                                'product_quantity' => $data['package_details']['quantity'] ?? 1,
+                                'each_product_invoice_amount' => $data['package_details']['value'] ?? 0,
+                                'each_product_collectable_amount' => $data['cod_amount'] ?? 0,
+                                'hsn' => ''
                             ]
                         ]
-                    ],
-                    'ewaybill_number' => '',
-                    'document_detail' => [
-                        'invoice_document_file' => '',
-                        'ewaybill_document_file' => ''
                     ]
+                ],
+                'ewaybill_number' => '',
+                'document_detail' => [
+                    'invoice_document_file' => '',
+                    'ewaybill_document_file' => ''
                 ]
             ];
 

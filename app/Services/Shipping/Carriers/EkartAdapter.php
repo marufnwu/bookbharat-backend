@@ -564,6 +564,12 @@ class EkartAdapter implements CarrierAdapterInterface
      */
     protected function getEkartWarehouseName(array $pickupAddress): string
     {
+        // First check if we have a warehouse name directly
+        if (!empty($pickupAddress['name'])) {
+            Log::info('Ekart using provided warehouse name', ['name' => $pickupAddress['name']]);
+            return $pickupAddress['name'];
+        }
+
         // Try to get warehouse name from carrier_warehouse pivot table
         $warehouse = \App\Models\Warehouse::where('name', $pickupAddress['name'] ?? '')
             ->orWhere('pincode', $pickupAddress['pincode'] ?? '')
@@ -707,9 +713,9 @@ class EkartAdapter implements CarrierAdapterInterface
 
     /**
      * Get warehouse requirement type for Ekart
-     * 
+     *
      * Ekart requires pre-registered address aliases
-     * 
+     *
      * @return string 'registered_alias'
      */
     public function getWarehouseRequirementType(): string

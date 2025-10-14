@@ -509,6 +509,20 @@ class MultiCarrierShippingService
         $adapter = $this->carrierFactory->make($carrier);
         $booking = $adapter->createShipment($shipmentData);
 
+        // Check if shipment creation was successful
+        if (!($booking['success'] ?? true)) {
+            throw new \Exception($booking['message'] ?? 'Shipment creation failed');
+        }
+
+        // Ensure we have a tracking number
+        if (!isset($booking['tracking_number'])) {
+            Log::error('Carrier did not return tracking number', [
+                'carrier' => $carrier->code,
+                'booking_response' => $booking
+            ]);
+            throw new \Exception('Carrier did not return tracking number. Please check carrier response.');
+        }
+
         // Create shipment record
         $shipment = new Shipment();
         $shipment->order_id = $order->id;
@@ -516,13 +530,15 @@ class MultiCarrierShippingService
         $shipment->service_code = $serviceCode; // Store service code directly
         $shipment->carrier_service_id = $service->id; // May be null if service record doesn't exist
         $shipment->tracking_number = $booking['tracking_number'];
-        $shipment->carrier_tracking_id = $booking['carrier_reference'] ?? null;
-        $shipment->status = 'created';
+        $shipment->carrier_tracking_id = $booking['carrier_reference'] ?? $booking['carrier_tracking_id'] ?? null;
+        $shipment->status = 'confirmed'; // Shipment is confirmed after successful API creation
+        $shipment->shipping_cost = $options['shipping_cost'] ?? 0; // Store the shipping cost from options
         $shipment->carrier_response = $booking;
-        $shipment->label_data = $booking['label'] ?? null;
+        $shipment->label_data = $booking['label'] ?? $booking['label_data'] ?? null;
+        $shipment->label_url = $booking['label_url'] ?? null;
         $shipment->pickup_token = $booking['pickup_token'] ?? null;
         $shipment->pickup_scheduled_at = $booking['pickup_date'] ?? null;
-        $shipment->expected_delivery_date = $booking['expected_delivery'] ?? null;
+        $shipment->expected_delivery_date = $booking['expected_delivery'] ?? $booking['expected_delivery_date'] ?? null;
         $shipment->save();
 
         // Schedule pickup if required
@@ -812,7 +828,7 @@ class MultiCarrierShippingService
                                 return $warehouse->toPickupAddress();
                             }
                         }
-                        
+
                         Log::warning('Warehouse not found, using default', [
                             'requested_warehouse' => $warehouseIdentifier
                         ]);
@@ -1196,7 +1212,12 @@ class MultiCarrierShippingService
                 $result = $adapter->getRegisteredAddresses();
             } else {
                 // Fallback to site warehouses if carrier doesn't support registered addresses
-                return $this->getFallbackWarehouses($carrier);
+                $fallback = $this->getFallbackWarehouses($carrier);
+                return [
+                    'success' => !empty($fallback),
+                    'warehouses' => $fallback,
+                    'source' => 'database'
+                ];
             }
 
             if ($result['success'] ?? false) {
@@ -1229,11 +1250,18 @@ class MultiCarrierShippingService
                     }, $rawData);
                 }
 
-                return $normalizedWarehouses;
+                return [
+                    'success' => true,
+                    'warehouses' => $normalizedWarehouses
+                ];
             }
 
-            // If API call failed, return empty array with note
-            return [];
+            // If API call failed, return empty with success=false
+            return [
+                'success' => false,
+                'warehouses' => [],
+                'error' => 'API call failed'
+            ];
 
         } catch (\Exception $e) {
             Log::error('Failed to get carrier registered pickup locations', [
@@ -1243,7 +1271,12 @@ class MultiCarrierShippingService
             ]);
 
             // Return fallback warehouses on error
-            return $this->getFallbackWarehouses($carrier);
+            $fallback = $this->getFallbackWarehouses($carrier);
+            return [
+                'success' => !empty($fallback),
+                'warehouses' => $fallback,
+                'source' => 'fallback'
+            ];
         }
     }
 
@@ -1343,7 +1376,7 @@ class MultiCarrierShippingService
                 'warehouses.id',
                 'warehouses.name',
                 'carrier_warehouse.carrier_warehouse_name',
-                'warehouses.address_1',
+                'warehouses.address_line_1',
                 'warehouses.city',
                 'warehouses.pincode',
                 'warehouses.phone',
@@ -1357,7 +1390,7 @@ class MultiCarrierShippingService
                 'id' => $mapping->id,
                 'name' => $mapping->name,
                 'carrier_warehouse_name' => $mapping->carrier_warehouse_name ?? $mapping->name,
-                'address' => $mapping->address_1,
+                'address' => $mapping->address_line_1,
                 'city' => $mapping->city,
                 'pincode' => $mapping->pincode,
                 'phone' => $mapping->phone,

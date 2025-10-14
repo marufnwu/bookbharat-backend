@@ -209,7 +209,7 @@ class WarehouseController extends Controller
 
                     return response()->json([
                         'success' => true,
-                        'data' => $registeredLocations,
+                        'data' => $registeredLocations['warehouses'] ?? [],
                         'carrier_code' => $carrier->code,
                         'requirement_type' => $requirementType,
                         'source' => 'carrier_api',

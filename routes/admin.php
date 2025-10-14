@@ -112,6 +112,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/{order}/send-email', [OrderController::class, 'sendEmail']);
         Route::post('/bulk-update-status', [OrderController::class, 'bulkUpdateStatus']);
         Route::get('/export', [OrderController::class, 'export']);
+
+        // Order Shipment Management
+        Route::get('/{order}/shipment', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'getOrderShipment']);
+        Route::delete('/{order}/shipment', [\App\Http\Controllers\Api\MultiCarrierShippingController::class, 'cancelOrderShipment']);
     });
 
     // User Management

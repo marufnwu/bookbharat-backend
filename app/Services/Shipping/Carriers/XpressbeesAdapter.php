@@ -162,6 +162,8 @@ class XpressbeesAdapter implements CarrierAdapterInterface
                 'weight' => $data['package_details']['weight']
             ];
 
+            Log::info('Xpressbees creating shipment', ['payload' => $shipmentData]);
+
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->token,
                 'Content-Type' => 'application/json'
@@ -169,6 +171,8 @@ class XpressbeesAdapter implements CarrierAdapterInterface
 
             if ($response->successful()) {
                 $result = $response->json();
+
+                Log::info('Xpressbees shipment response', ['response' => $result]);
 
                 if (isset($result['data'])) {
                     return [
@@ -187,7 +191,16 @@ class XpressbeesAdapter implements CarrierAdapterInterface
                 }
             }
 
-            throw new \Exception('Failed to create Xpressbees shipment');
+            $errorMessage = $response->json()['message'] ?? 'Failed to create Xpressbees shipment';
+            $errorDetails = $response->json();
+
+            Log::error('Xpressbees shipment creation failed', [
+                'status' => $response->status(),
+                'error' => $errorMessage,
+                'response' => $errorDetails
+            ]);
+
+            throw new \Exception($errorMessage);
 
         } catch (\Exception $e) {
             Log::error('Xpressbees create shipment error', ['error' => $e->getMessage()]);
@@ -463,9 +476,9 @@ class XpressbeesAdapter implements CarrierAdapterInterface
 
     /**
      * Get warehouse requirement type for Xpressbees
-     * 
+     *
      * Xpressbees accepts full pickup address in each shipment request
-     * 
+     *
      * @return string 'full_address'
      */
     public function getWarehouseRequirementType(): string
