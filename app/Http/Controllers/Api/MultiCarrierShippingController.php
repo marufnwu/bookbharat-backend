@@ -345,13 +345,32 @@ class MultiCarrierShippingController extends Controller
             }
 
             // Try to cancel with carrier
-            $result = $this->shippingService->cancelShipment($shipment);
+            try {
+                $result = $this->shippingService->cancelShipment($shipment);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Shipment cancelled successfully',
-                'shipment_id' => $shipment->id
-            ]);
+                // Reload shipment to get updated cancellation reason
+                $shipment->refresh();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Shipment cancelled successfully',
+                    'shipment_id' => $shipment->id,
+                    'cancellation_note' => $shipment->cancellation_reason
+                ]);
+
+            } catch (\Exception $e) {
+                // Shipment is marked as cancelled, but there was an API issue
+                // Reload to get the updated status
+                $shipment->refresh();
+
+                return response()->json([
+                    'success' => true, // Still success since it's cancelled in our system
+                    'message' => 'Shipment cancelled in system',
+                    'warning' => $e->getMessage(),
+                    'shipment_id' => $shipment->id,
+                    'cancellation_note' => $shipment->cancellation_reason
+                ]);
+            }
 
         } catch (\Exception $e) {
             Log::error('Failed to cancel order shipment', [

@@ -566,23 +566,60 @@ class MultiCarrierShippingService
         $adapter = $this->carrierFactory->make($carrier);
 
         try {
+            Log::info("Attempting to cancel shipment with carrier", [
+                'shipment_id' => $shipment->id,
+                'tracking_number' => $shipment->tracking_number,
+                'carrier' => $carrier->name
+            ]);
+
             $result = $adapter->cancelShipment($shipment->tracking_number);
 
             if ($result) {
                 $shipment->status = 'cancelled';
                 $shipment->cancelled_at = now();
+                $shipment->cancellation_reason = 'Cancelled by admin';
                 $shipment->save();
 
-                $this->logApiCall($carrier, 'cancel', ['tracking_number' => $shipment->tracking_number], $result);
-            }
+                Log::info("Shipment cancelled successfully", [
+                    'shipment_id' => $shipment->id,
+                    'tracking_number' => $shipment->tracking_number
+                ]);
 
-            return $result;
+                $this->logApiCall($carrier, 'cancel', ['tracking_number' => $shipment->tracking_number], $result);
+
+                return true;
+            } else {
+                Log::warning("Carrier API returned false for cancellation", [
+                    'shipment_id' => $shipment->id,
+                    'tracking_number' => $shipment->tracking_number,
+                    'carrier' => $carrier->name
+                ]);
+
+                // Mark as cancelled in our system even if carrier API fails
+                // This prevents stuck shipments
+                $shipment->status = 'cancelled';
+                $shipment->cancelled_at = now();
+                $shipment->cancellation_reason = 'Cancelled by admin (carrier API did not confirm)';
+                $shipment->save();
+
+                return true; // Return true to allow frontend to proceed
+            }
         } catch (\Exception $e) {
             Log::error("Failed to cancel shipment", [
                 'shipment_id' => $shipment->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-            return false;
+
+            // Mark as cancelled in database even on API error
+            // Admin explicitly requested cancellation
+            $shipment->status = 'cancelled';
+            $shipment->cancelled_at = now();
+            $shipment->cancellation_reason = 'Cancelled by admin (API error: ' . $e->getMessage() . ')';
+            $shipment->save();
+
+            // Throw exception to show error to admin
+            throw new \Exception("Shipment marked as cancelled locally, but carrier API error: " . $e->getMessage());
         }
     }
 
