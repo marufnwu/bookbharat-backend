@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Mews\Purifier\Facades\Purifier;
 
 class ProductController extends Controller
 {
@@ -140,6 +141,18 @@ class ProductController extends Controller
                 'tags'
             ]);
 
+            // Sanitize HTML content in description
+            if (isset($productData['description'])) {
+                $productData['description'] = Purifier::clean($productData['description'], [
+                    'HTML.Allowed' => 'p,b,strong,i,em,u,a[href|title|target],ul,ol,li,br,h1,h2,h3,h4,h5,h6,blockquote,code,pre,img[src|alt|width|height|title],table,thead,tbody,tr,td,th,span[style],div[style]',
+                    'CSS.AllowedProperties' => 'color,background-color,font-weight,text-align,margin,padding',
+                ]);
+            }
+
+            if (isset($productData['short_description'])) {
+                $productData['short_description'] = Purifier::clean($productData['short_description']);
+            }
+
             // Set status based on is_active field
             $productData['status'] = $productData['is_active'] ? 'active' : 'draft';
 
@@ -254,14 +267,28 @@ class ProductController extends Controller
 
             $oldStockQuantity = $product->stock_quantity;
 
-            $product->update($request->only([
+            $updateData = $request->only([
                 'name', 'slug', 'sku', 'category_id', 'description', 'short_description',
                 'author', 'publisher', 'isbn', 'publication_date', 'language', 'pages',
                 'weight', 'dimensions', 'price', 'compare_price', 'cost_price',
                 'stock_quantity', 'low_stock_threshold', 'track_stock', 'allow_backorder',
                 'is_active', 'is_featured', 'meta_title', 'meta_description', 'meta_keywords',
                 'tags'
-            ]));
+            ]);
+
+            // Sanitize HTML content in description
+            if (isset($updateData['description'])) {
+                $updateData['description'] = Purifier::clean($updateData['description'], [
+                    'HTML.Allowed' => 'p,b,strong,i,em,u,a[href|title|target],ul,ol,li,br,h1,h2,h3,h4,h5,h6,blockquote,code,pre,img[src|alt|width|height|title],table,thead,tbody,tr,td,th,span[style],div[style]',
+                    'CSS.AllowedProperties' => 'color,background-color,font-weight,text-align,margin,padding',
+                ]);
+            }
+
+            if (isset($updateData['short_description'])) {
+                $updateData['short_description'] = Purifier::clean($updateData['short_description']);
+            }
+
+            $product->update($updateData);
 
             // Handle product attributes
             if ($request->has('attributes')) {
