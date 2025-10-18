@@ -142,6 +142,19 @@ class MediaLibraryController extends Controller
                 $url = Storage::disk('public')->url($path);
             }
 
+            // Get file size safely
+            $fileSize = null;
+            try {
+                if ($conversions && isset($conversions['original']['size'])) {
+                    $fileSize = $conversions['original']['size'];
+                } else {
+                    $fileSize = Storage::disk('public')->size($path);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Could not retrieve file size: ' . $e->getMessage());
+                $fileSize = $file->getSize(); // Use original file size as fallback
+            }
+
             // Create media record
             $media = Media::create([
                 'filename' => $filename,
@@ -149,7 +162,7 @@ class MediaLibraryController extends Controller
                 'path' => $path,
                 'url' => $url,
                 'mime_type' => $file->getMimeType(),
-                'file_size' => Storage::disk('public')->size($path),
+                'file_size' => $fileSize,
                 'width' => $width,
                 'height' => $height,
                 'disk' => 'public',

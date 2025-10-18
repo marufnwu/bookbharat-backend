@@ -80,7 +80,11 @@ class HeroConfigController extends Controller
                 'secondaryCta.text' => 'required_with:secondaryCta|string|max:100',
                 'secondaryCta.href' => 'required_with:secondaryCta|string|max:255',
                 'stats' => 'nullable|array',
-                'backgroundImage' => 'nullable|string|max:500',
+                'backgroundImage' => ['nullable', 'string', 'max:500', function ($attribute, $value, $fail) {
+                    if ($value && !filter_var($value, FILTER_VALIDATE_URL) && !str_starts_with($value, '/')) {
+                        $fail('The ' . $attribute . ' must be a valid URL or start with /');
+                    }
+                }],
                 'categories' => 'nullable|array',
                 'testimonials' => 'nullable|array',
                 'features' => 'nullable|array',
@@ -88,7 +92,11 @@ class HeroConfigController extends Controller
                 'discountBadge' => 'nullable|array',
                 'trustBadges' => 'nullable|array',
                 'featuredProducts' => 'nullable|array',
-                'videoUrl' => 'nullable|string|max:500',
+                'videoUrl' => ['nullable', 'string', 'max:500', function ($attribute, $value, $fail) {
+                    if ($value && !filter_var($value, FILTER_VALIDATE_URL) && !str_starts_with($value, '/')) {
+                        $fail('The ' . $attribute . ' must be a valid URL or start with /');
+                    }
+                }],
                 'is_active' => 'nullable|boolean',
             ]);
 
@@ -139,7 +147,11 @@ class HeroConfigController extends Controller
                 'primaryCta' => 'nullable|array',
                 'secondaryCta' => 'nullable|array',
                 'stats' => 'nullable|array',
-                'backgroundImage' => 'nullable|string|max:500',
+                'backgroundImage' => ['nullable', 'string', 'max:500', function ($attribute, $value, $fail) {
+                    if ($value && !filter_var($value, FILTER_VALIDATE_URL) && !str_starts_with($value, '/')) {
+                        $fail('The ' . $attribute . ' must be a valid URL or start with /');
+                    }
+                }],
                 'categories' => 'nullable|array',
                 'testimonials' => 'nullable|array',
                 'features' => 'nullable|array',
@@ -147,7 +159,11 @@ class HeroConfigController extends Controller
                 'discountBadge' => 'nullable|array',
                 'trustBadges' => 'nullable|array',
                 'featuredProducts' => 'nullable|array',
-                'videoUrl' => 'nullable|string|max:500',
+                'videoUrl' => ['nullable', 'string', 'max:500', function ($attribute, $value, $fail) {
+                    if ($value && !filter_var($value, FILTER_VALIDATE_URL) && !str_starts_with($value, '/')) {
+                        $fail('The ' . $attribute . ' must be a valid URL or start with /');
+                    }
+                }],
                 'is_active' => 'nullable|boolean',
             ]);
 

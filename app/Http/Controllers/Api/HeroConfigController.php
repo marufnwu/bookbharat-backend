@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\HeroConfiguration;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -16,6 +17,11 @@ class HeroConfigController extends Controller
     {
         try {
             $heroConfigs = HeroConfiguration::all();
+
+            // Load featured products data for each config
+            $heroConfigs->each(function ($config) {
+                $this->loadFeaturedProducts($config);
+            });
 
             return response()->json([
                 'success' => true,
@@ -47,6 +53,9 @@ class HeroConfigController extends Controller
                 ], 404);
             }
 
+            // Load featured products data
+            $this->loadFeaturedProducts($config);
+
             return response()->json([
                 'success' => true,
                 'data' => $config
@@ -75,6 +84,11 @@ class HeroConfigController extends Controller
                 $activeConfig = HeroConfiguration::first();
             }
 
+            // Load featured products data
+            if ($activeConfig) {
+                $this->loadFeaturedProducts($activeConfig);
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $activeConfig
@@ -87,6 +101,52 @@ class HeroConfigController extends Controller
                 'success' => false,
                 'message' => 'Unable to retrieve active hero configuration.',
             ], 500);
+        }
+    }
+
+    /**
+     * Load featured products data for a hero configuration
+     */
+    private function loadFeaturedProducts($config)
+    {
+        if ($config && !empty($config->featuredProducts) && is_array($config->featuredProducts)) {
+            try {
+                $productIds = $config->featuredProducts;
+                $products = Product::with(['images', 'category'])
+                    ->whereIn('id', $productIds)
+                    ->where('is_active', true)
+                    ->get()
+                    ->map(function ($product) {
+                        return [
+                            'id' => $product->id,
+                            'name' => $product->name,
+                            'slug' => $product->slug,
+                            'price' => $product->price,
+                            'sale_price' => $product->sale_price,
+                            'short_description' => $product->short_description,
+                            'images' => $product->images,
+                            'category' => $product->category,
+                            'average_rating' => $product->average_rating,
+                            'total_reviews' => $product->total_reviews,
+                            'stock_quantity' => $product->stock_quantity,
+                        ];
+                    })
+                    ->toArray();
+
+                // Preserve the order specified in featuredProducts
+                $orderedProducts = [];
+                foreach ($productIds as $id) {
+                    $foundProduct = collect($products)->firstWhere('id', $id);
+                    if ($foundProduct) {
+                        $orderedProducts[] = $foundProduct;
+                    }
+                }
+
+                $config->featuredProducts = $orderedProducts;
+            } catch (\Exception $e) {
+                Log::error('Error loading featured products: ' . $e->getMessage());
+                // Keep the original array if loading fails
+            }
         }
     }
 

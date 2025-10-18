@@ -4,7 +4,8 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class ImageOptimizationService
 {
@@ -22,9 +23,13 @@ class ImageOptimizationService
         'png' => 9, // Compression level for PNG (0-9)
     ];
 
+    protected $manager;
+
     public function __construct()
     {
-        $this->disk = config('filesystems.default', 'public');
+        // Always use 'public' disk for media uploads to be web-accessible
+        $this->disk = 'public';
+        $this->manager = new ImageManager(new Driver());
     }
 
     /**
@@ -47,7 +52,7 @@ class ImageOptimizationService
         $path = $folder . '/' . date('Y/m');
 
         // Create original image
-        $image = Image::make($file);
+        $image = $this->manager->read($file);
 
         // Store original (optimized)
         $originalPath = $path . '/' . $filename . '.' . $originalExtension;
@@ -63,13 +68,10 @@ class ImageOptimizationService
 
         // Create different sizes
         foreach ($sizes as $sizeName => $dimensions) {
-            $sizedImage = clone $image;
+            $sizedImage = $this->manager->read($file);
 
             // Resize maintaining aspect ratio
-            $sizedImage->resize($dimensions['width'], $dimensions['height'], function ($constraint) {
-                $constraint->aspectRatio();
-                $constraint->upsize(); // Prevent upsizing
-            });
+            $sizedImage->scale(width: $dimensions['width'], height: $dimensions['height']);
 
             // Save as original format
             $sizePath = $path . '/' . $filename . '_' . $sizeName . '.' . $originalExtension;
@@ -85,24 +87,25 @@ class ImageOptimizationService
 
             // Also create WebP version
             if ($originalExtension !== 'webp') {
+                $webpImage = $this->manager->read($file);
+                $webpImage->scale(width: $dimensions['width'], height: $dimensions['height']);
+
                 $webpPath = $path . '/' . $filename . '_' . $sizeName . '.webp';
-                $this->saveOptimizedImage($sizedImage, $webpPath, 'webp');
+                $this->saveOptimizedImage($webpImage, $webpPath, 'webp');
 
                 $conversions[$sizeName . '_webp'] = [
                     'path' => $webpPath,
                     'url' => Storage::disk($this->disk)->url($webpPath),
-                    'width' => $sizedImage->width(),
-                    'height' => $sizedImage->height(),
+                    'width' => $webpImage->width(),
+                    'height' => $webpImage->height(),
                     'size' => Storage::disk($this->disk)->size($webpPath),
                 ];
             }
-
-            $sizedImage->destroy();
         }
 
         // Create WebP version of original
         if ($originalExtension !== 'webp') {
-            $webpImage = clone $image;
+            $webpImage = $this->manager->read($file);
             $webpPath = $path . '/' . $filename . '.webp';
             $this->saveOptimizedImage($webpImage, $webpPath, 'webp');
 
@@ -113,11 +116,7 @@ class ImageOptimizationService
                 'height' => $webpImage->height(),
                 'size' => Storage::disk($this->disk)->size($webpPath),
             ];
-
-            $webpImage->destroy();
         }
-
-        $image->destroy();
 
         return $conversions;
     }
@@ -137,22 +136,22 @@ class ImageOptimizationService
         switch ($format) {
             case 'jpg':
             case 'jpeg':
-                $encoded = $image->encode('jpg', $this->quality['jpeg']);
+                $encoded = $image->toJpeg($this->quality['jpeg']);
                 break;
             case 'webp':
-                $encoded = $image->encode('webp', $this->quality['webp']);
+                $encoded = $image->toWebp($this->quality['webp']);
                 break;
             case 'png':
-                $encoded = $image->encode('png', $this->quality['png']);
+                $encoded = $image->toPng();
                 break;
             case 'gif':
-                $encoded = $image->encode('gif');
+                $encoded = $image->toGif();
                 break;
             default:
-                $encoded = $image->encode();
+                $encoded = $image->toJpeg($this->quality['jpeg']);
         }
 
-        Storage::disk($this->disk)->put($path, $encoded);
+        Storage::disk($this->disk)->put($path, (string) $encoded);
     }
 
     /**
