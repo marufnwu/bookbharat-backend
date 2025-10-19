@@ -166,6 +166,16 @@ class Product extends Model
         return $this->hasMany(ProductAssociation::class, 'associated_product_id');
     }
 
+    public function bundleVariants(): HasMany
+    {
+        return $this->hasMany(ProductBundleVariant::class)->orderBy('sort_order');
+    }
+
+    public function activeBundleVariants(): HasMany
+    {
+        return $this->hasMany(ProductBundleVariant::class)->where('is_active', true)->orderBy('sort_order');
+    }
+
     // Scopes
     public function scopeActive($query)
     {

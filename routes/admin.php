@@ -34,6 +34,7 @@ use App\Http\Controllers\Admin\NewsletterController as AdminNewsletterController
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PaymentAnalyticsController;
 use App\Http\Controllers\Admin\PaymentTransactionController;
+use App\Http\Controllers\Admin\ProductBundleVariantController;
 
 /*
 |--------------------------------------------------------------------------
@@ -85,6 +86,15 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/{product}/analytics', [ProductController::class, 'analytics']);
         Route::post('/import', [ProductController::class, 'import']);
         Route::get('/export', [ProductController::class, 'export']);
+        
+        // Bundle Variant Management
+        Route::get('/{product}/bundle-variants', [ProductBundleVariantController::class, 'index']);
+        Route::post('/{product}/bundle-variants', [ProductBundleVariantController::class, 'store']);
+        Route::get('/{product}/bundle-variants/{bundleVariant}', [ProductBundleVariantController::class, 'show']);
+        Route::put('/{product}/bundle-variants/{bundleVariant}', [ProductBundleVariantController::class, 'update']);
+        Route::delete('/{product}/bundle-variants/{bundleVariant}', [ProductBundleVariantController::class, 'destroy']);
+        Route::post('/{product}/bundle-variants/calculate-price', [ProductBundleVariantController::class, 'calculatePrice']);
+        Route::post('/{product}/bundle-variants/update-sort-order', [ProductBundleVariantController::class, 'updateSortOrder']);
     });
 
     // Category Management

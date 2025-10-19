@@ -14,6 +14,7 @@ class CartItem extends Model
         'cart_id',
         'product_id',
         'variant_id',
+        'bundle_variant_id',
         'quantity',
         'unit_price',
         'attributes'
@@ -41,9 +42,24 @@ class CartItem extends Model
         return $this->belongsTo(ProductVariant::class);
     }
 
+    public function bundleVariant(): BelongsTo
+    {
+        return $this->belongsTo(ProductBundleVariant::class, 'bundle_variant_id');
+    }
+
     // Accessors
     public function getTotalPriceAttribute()
     {
+        // If this is a bundle variant, use the bundle's calculated price
+        if ($this->bundle_variant_id && $this->bundleVariant) {
+            return $this->bundleVariant->calculated_price * $this->quantity;
+        }
+
         return $this->unit_price * $this->quantity;
+    }
+
+    public function getIsBundleAttribute(): bool
+    {
+        return $this->bundle_variant_id !== null;
     }
 }

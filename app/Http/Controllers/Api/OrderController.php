@@ -52,7 +52,7 @@ class OrderController extends Controller
         // Determine if user is authenticated
         $user = Auth::user();
         $isAuthenticated = $user !== null;
-        
+
         // Dynamic validation based on authentication status
         if ($isAuthenticated) {
             $request->validate([
@@ -107,16 +107,28 @@ class OrderController extends Controller
             if (!$cart || !$cart->items || $cart->items->isEmpty()) {
                 throw new \Exception('Cart is empty or not found');
             }
-            
+
             // Validate each cart item for stock availability
             foreach ($cart->items as $item) {
                 $product = $item->product;
                 $variant = $item->variant;
-                if ($variant) {
+                $bundleVariant = $item->bundleVariant;
+
+                // Check bundle variant stock
+                if ($bundleVariant) {
+                    if (!$bundleVariant->canPurchase($item->quantity)) {
+                        $availableStock = $bundleVariant->effective_stock;
+                        throw new \Exception("Insufficient stock for {$product->name} - {$bundleVariant->name}. Available: {$availableStock} bundles, Requested: {$item->quantity}");
+                    }
+                }
+                // Check regular variant stock
+                elseif ($variant) {
                     if ($variant->available_stock < $item->quantity) {
                         throw new \Exception("Insufficient stock for {$product->name} - {$variant->name}. Available: {$variant->available_stock}, Requested: {$item->quantity}");
                     }
-                } else {
+                }
+                // Check regular product stock
+                else {
                     if ($product->stock_quantity < $item->quantity) {
                         throw new \Exception("Insufficient stock for {$product->name}. Available: {$product->stock_quantity}, Requested: {$item->quantity}");
                     }
@@ -197,17 +209,18 @@ class OrderController extends Controller
                 foreach ($cart->items as $cartItem) {
                     $product = $cartItem->product;
                     $variant = $cartItem->variant;
-                    
+
                     // Get product name (with variant name if applicable)
                     $productName = $product->name;
                     if ($variant && $variant->name) {
                         $productName .= ' - ' . $variant->name;
                     }
-                    
+
                     // Get product SKU (use variant SKU if available, otherwise product SKU)
                     $productSku = $variant && $variant->sku ? $variant->sku : ($product->sku ?? $product->slug ?? 'N/A');
-                    
-                    $order->orderItems()->create([
+
+                    // Prepare order item data
+                    $orderItemData = [
                         'product_id' => $cartItem->product_id,
                         'product_name' => $productName,
                         'product_sku' => $productSku,
@@ -215,7 +228,16 @@ class OrderController extends Controller
                         'unit_price' => $cartItem->unit_price,
                         'total_price' => $cartItem->total_price ?? ($cartItem->unit_price * $cartItem->quantity),
                         'product_attributes' => $cartItem->attributes ? json_encode($cartItem->attributes) : null,
-                    ]);
+                    ];
+
+                    // Add bundle variant data if this is a bundle
+                    if ($cartItem->bundle_variant_id) {
+                        $orderItemData['bundle_variant_id'] = $cartItem->bundle_variant_id;
+                        $orderItemData['bundle_quantity'] = $cartItem->attributes['bundle_quantity'] ?? null;
+                        $orderItemData['bundle_variant_name'] = $cartItem->attributes['bundle_name'] ?? null;
+                    }
+
+                    $order->orderItems()->create($orderItemData);
                 }
             }
 
@@ -287,12 +309,12 @@ class OrderController extends Controller
 
         // Transform the order data to match frontend expectations
         $orderData = $order->toArray();
-        
+
         // Add computed fields
         $orderData['customer_name'] = $order->user->name ?? $order->customer_name;
         $orderData['customer_email'] = $order->user->email ?? $order->customer_email;
         $orderData['customer_phone'] = $order->user->phone ?? $order->customer_phone;
-        
+
         // Parse shipping and billing addresses if they're JSON
         if (is_string($orderData['shipping_address'])) {
             $orderData['shipping_address'] = json_decode($orderData['shipping_address'], true);
@@ -372,11 +394,11 @@ class OrderController extends Controller
             // Generate PDF
             $pdf = Pdf::loadView('pdf.invoice', compact('order'));
             $pdf->setPaper('A4', 'portrait');
-            
+
             $filename = 'invoice-' . $order->order_number . '.pdf';
-            
+
             return $pdf->download($filename);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -406,11 +428,11 @@ class OrderController extends Controller
             // Generate PDF
             $pdf = Pdf::loadView('pdf.receipt', compact('order'));
             $pdf->setPaper('A4', 'portrait');
-            
+
             $filename = 'receipt-' . $order->order_number . '.pdf';
-            
+
             return $pdf->download($filename);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

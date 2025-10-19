@@ -63,6 +63,7 @@ class CartController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'variant_id' => 'nullable|exists:product_variants,id',
+            'bundle_variant_id' => 'nullable|exists:product_bundle_variants,id',
             'quantity' => 'required|integer|min:1|max:99',
             'attributes' => 'nullable|array',
         ]);
@@ -72,14 +73,24 @@ class CartController extends Controller
             $userId = $user ? $user->id : null;
             $sessionId = $request->header('X-Session-ID');
 
-            $cartItem = $this->cartService->addToCart(
-                $request->product_id,
-                $request->variant_id,
-                $request->quantity,
-                $request->attributes ?? [],
-                $userId,
-                $sessionId
-            );
+            // If bundle variant ID is provided, use bundle cart method
+            if ($request->has('bundle_variant_id')) {
+                $cartItem = $this->cartService->addBundleVariantToCart(
+                    $request->bundle_variant_id,
+                    $request->quantity,
+                    $userId,
+                    $sessionId
+                );
+            } else {
+                $cartItem = $this->cartService->addToCart(
+                    $request->product_id,
+                    $request->variant_id,
+                    $request->quantity,
+                    $request->attributes ?? [],
+                    $userId,
+                    $sessionId
+                );
+            }
 
             $cartSummary = $this->cartService->getCartSummary($userId, $sessionId);
 

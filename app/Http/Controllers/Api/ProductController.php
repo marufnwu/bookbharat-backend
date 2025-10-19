@@ -60,7 +60,7 @@ class ProductController extends Controller
         // Sorting
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
-        
+
         switch ($sortBy) {
             case 'price_low_to_high':
                 $query->orderBy('price', 'asc');
@@ -98,13 +98,14 @@ class ProductController extends Controller
     {
         // Try to find by ID first (if numeric), then by slug
         $query = Product::with([
-            'category', 
-            'images', 
+            'category',
+            'images',
             'reviews' => function($query) {
                 $query->approved()->with('user:id,name')->latest();
-            }
+            },
+            'activeBundleVariants'
         ])->active();
-        
+
         if (is_numeric($id)) {
             $product = $query->findOrFail($id);
         } else {
@@ -138,7 +139,7 @@ class ProductController extends Controller
     public function featured(Request $request)
     {
         $limit = min($request->get('limit', 12), 50);
-        
+
         $products = Product::with(['category', 'images'])
             ->active()
             ->inStock()
@@ -159,7 +160,7 @@ class ProductController extends Controller
     public function byCategory($categoryId, Request $request)
     {
         $category = Category::active()->findOrFail($categoryId);
-        
+
         $query = Product::with(['category', 'images'])
             ->active()
             ->inStock()
@@ -266,16 +267,16 @@ class ProductController extends Controller
     public function filters(Request $request)
     {
         $categoryId = $request->get('category_id');
-        
+
         $query = Product::active();
-        
+
         if ($categoryId) {
             $query->byCategory($categoryId);
         }
 
         // Get price range
         $priceRange = $query->selectRaw('MIN(price) as min_price, MAX(price) as max_price')->first();
-        
+
         // Get brands
         $brands = Product::active()
             ->when($categoryId, function($q) use ($categoryId) {
@@ -315,7 +316,7 @@ class ProductController extends Controller
     {
         $limit = min($request->get('limit', 6), 20); // Categories limit
         $productsPerCategory = min($request->get('products_per_category', 4), 12);
-        
+
         // Get active categories with products
         $categories = Category::active()
             ->whereHas('products', function($query) {
@@ -349,7 +350,7 @@ class ProductController extends Controller
             $product = Product::where('slug', $id)->firstOrFail();
             $id = $product->id; // Use numeric ID for the service
         }
-        
+
         $relatedProducts = $this->recommendationService->getRelatedProducts($id, 6);
 
         return response()->json([

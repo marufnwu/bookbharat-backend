@@ -46,6 +46,8 @@ class OrderService
 
     /**
      * Update inventory for ordered items
+     * NOTE: Stock is already reduced when items are added to cart
+     * This method only updates sales count and stock status
      */
     protected function updateInventory(Order $order): void
     {
@@ -53,13 +55,14 @@ class OrderService
             foreach ($order->orderItems as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
                 if ($product) {
-                    // Decrease stock quantity
-                    $product->decrement('stock_quantity', $item->quantity);
+                    // Stock is ALREADY reduced when added to cart, so we DON'T reduce again here
+                    // Only update sales count
 
-                    // Update sales count
-                    $product->increment('sales_count', $item->quantity);
+                    // For bundle variants, increment by the bundle quantity
+                    $salesIncrement = $item->bundle_quantity ? ($item->quantity * $item->bundle_quantity) : $item->quantity;
+                    $product->increment('sales_count', $salesIncrement);
 
-                    // Check if product is now out of stock
+                    // Update stock status flags
                     if ($product->stock_quantity <= 0) {
                         $product->update(['stock_status' => 'out_of_stock']);
                     } elseif ($product->stock_quantity <= 10) {
