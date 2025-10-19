@@ -40,7 +40,7 @@ class PayuGateway extends BasePaymentGateway
     protected function hasRequiredConfiguration(): bool
     {
         return !empty($this->getConfig('merchant_key')) &&
-               !empty($this->getConfig('salt'));
+               !empty($this->getConfig('merchant_salt'));
     }
 
     public function initiatePayment(Order $order, array $options = []): array
@@ -143,7 +143,28 @@ class PayuGateway extends BasePaymentGateway
         }
 
         // Generate hash as per PayU specification
-        $data['hash'] = $this->generateRequestHash($data);
+        // Only include fields that are part of the hash calculation
+        $hashData = [
+            'key' => $data['key'],
+            'txnid' => $data['txnid'],
+            'amount' => $data['amount'],
+            'productinfo' => $data['productinfo'],
+            'firstname' => $data['firstname'],
+            'email' => $data['email'],
+            'udf1' => $data['udf1'],
+            'udf2' => $data['udf2'],
+            'udf3' => $data['udf3'],
+            'udf4' => $data['udf4'],
+            'udf5' => $data['udf5'],
+        ];
+
+        $data['hash'] = $this->generateRequestHash($hashData);
+
+        // Log hash data for debugging
+        \Log::info('PayU Hash Data:', [
+            'hash_data' => $hashData,
+            'generated_hash' => $data['hash']
+        ]);
 
         return $data;
     }
@@ -157,7 +178,7 @@ class PayuGateway extends BasePaymentGateway
 
     protected function generateRequestHash(array $data): string
     {
-        $salt = $this->getConfig('salt');
+        $salt = $this->getConfig('merchant_salt');
 
 
         // PayU hash format: sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT)
@@ -178,7 +199,9 @@ class PayuGateway extends BasePaymentGateway
 
         $this->logActivity('Hash generated', [
             'txnid' => $data['txnid'],
-            'format' => 'key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT'
+            'format' => 'key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT',
+            'hash_string' => $hashString,
+            'generated_hash' => $hash
         ]);
 
         return $hash;
@@ -230,7 +253,7 @@ class PayuGateway extends BasePaymentGateway
     protected function callPayuVerificationApi(string $transactionId): array
     {
         $merchantKey = $this->getConfig('merchant_key');
-        $salt = $this->getConfig('salt');
+        $salt = $this->getConfig('merchant_salt');
 
         // Generate verification hash as per PayU documentation
         $hashString = $merchantKey . '|verify_payment|' . $transactionId . '|' . $salt;
@@ -483,7 +506,7 @@ class PayuGateway extends BasePaymentGateway
 
     protected function validateWebhookHash(Request $request): bool
     {
-        $salt = $this->getConfig('salt');
+        $salt = $this->getConfig('merchant_salt');
         $status = $request->input('status');
         $receivedHash = $request->input('hash');
 
@@ -522,7 +545,7 @@ class PayuGateway extends BasePaymentGateway
 
     protected function validateResponseHash(Request $request): bool
     {
-        $salt = $this->getConfig('salt');
+        $salt = $this->getConfig('merchant_salt');
         $status = $request->input('status');
 
         // Response hash format for PayU

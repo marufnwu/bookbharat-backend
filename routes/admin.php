@@ -32,6 +32,8 @@ use App\Http\Controllers\Admin\MediaLibraryController;
 use App\Http\Controllers\Admin\PromotionalBannerController;
 use App\Http\Controllers\Admin\NewsletterController as AdminNewsletterController;
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\PaymentAnalyticsController;
+use App\Http\Controllers\Admin\PaymentTransactionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -312,17 +314,23 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/analytics', [ContentModerationController::class, 'getContentAnalytics']);
     });
 
-    // Payment Management - TODO: Implement PaymentController
-    // Route::prefix('payments')->group(function () {
-    //     Route::get('/', [PaymentController::class, 'index']);
-    //     Route::get('/{payment}', [PaymentController::class, 'show']);
-    //     Route::post('/{payment}/refund', [PaymentController::class, 'refund']);
-    //     Route::get('/gateways', [PaymentController::class, 'getGateways']);
-    //     Route::put('/gateways/{gateway}', [PaymentController::class, 'updateGateway']);
-    //     Route::get('/transactions', [PaymentController::class, 'getTransactions']);
-    //     Route::get('/refunds', [PaymentController::class, 'getRefunds']);
-    //     Route::get('/analytics', [PaymentController::class, 'getAnalytics']);
-    // });
+    // Payment Analytics
+    Route::prefix('payment-analytics')->group(function () {
+        Route::get('/summary', [PaymentAnalyticsController::class, 'summary']);
+        Route::get('/revenue-trend', [PaymentAnalyticsController::class, 'revenueTrend']);
+        Route::get('/method-distribution', [PaymentAnalyticsController::class, 'methodDistribution']);
+        Route::get('/gateway-performance', [PaymentAnalyticsController::class, 'gatewayPerformance']);
+        Route::get('/recent-failed', [PaymentAnalyticsController::class, 'recentFailedPayments']);
+        Route::get('/status-distribution', [PaymentAnalyticsController::class, 'statusDistribution']);
+    });
+
+    // Payment Transactions & Logs
+    Route::prefix('payment-transactions')->group(function () {
+        Route::get('/', [PaymentTransactionController::class, 'index']);
+        Route::get('/export', [PaymentTransactionController::class, 'export']);
+        Route::get('/webhooks', [PaymentTransactionController::class, 'webhookLogs']);
+        Route::get('/{id}', [PaymentTransactionController::class, 'show']);
+    });
 
     // Reports
     Route::prefix('reports')->group(function () {

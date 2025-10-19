@@ -29,7 +29,12 @@ abstract class BasePaymentGateway implements PaymentGatewayInterface
         $setting = PaymentMethod::where('payment_method', $this->getGatewayKeyword())->first();
 
         if ($setting) {
-            $this->config = $setting->configuration ?? [];
+            // Merge both credentials and configuration into config
+            // This allows hasRequiredConfiguration() to check credentials too
+            $this->config = array_merge(
+                $setting->credentials ?? [],
+                $setting->configuration ?? []
+            );
             $this->isProduction = $setting->is_production_mode ?? false;
             $this->supportedCurrencies = ['INR']; // Fixed to INR
         } else {
