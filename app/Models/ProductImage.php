@@ -35,20 +35,12 @@ class ProductImage extends Model
     // Accessors
     public function getImageUrlAttribute()
     {
-        // Check if image_path is already a full URL
+        // Check if image_path is already a full URL (external URL)
         if (filter_var($this->image_path, FILTER_VALIDATE_URL)) {
             return $this->image_path;
         }
 
-        // Get the storage URL
-        $url = Storage::disk('public')->url($this->image_path);
-
-        // If URL is relative, prepend the APP_URL
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            $appUrl = rtrim(config('app.url'), '/');
-            $url = $appUrl . $url;
-        }
-
-        return $url;
+        // Storage::disk('public')->url() already includes APP_URL from config/filesystems.php
+        return Storage::disk('public')->url($this->image_path);
     }
 }

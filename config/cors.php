@@ -50,10 +50,11 @@ return [
             // Production URLs
             env('FRONTEND_URL'),      // Production frontend
             env('ADMIN_URL'),         // Production admin panel
-            'http://v2a.bookbharat.com',
-            'https://v2a.bookbharat.com',
-            'http://v2.bookbharat.com',
-            'https://v2.bookbharat.com',
+            'https://v2s.bookbharat.com',  // Backend API (for internal requests)
+            'https://v2a.bookbharat.com',  // Admin Panel
+            'https://v2.bookbharat.com',   // Frontend
+            'http://v2a.bookbharat.com',   // Allow HTTP for testing (remove in production)
+            'http://v2.bookbharat.com',    // Allow HTTP for testing (remove in production)
         ]
     )),
 

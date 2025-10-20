@@ -29,8 +29,8 @@ class CorsMiddleware
                 $response->header('Access-Control-Allow-Origin', $origin);
             }
 
-            $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            $response->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With, X-CSRF-TOKEN');
+            $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+            $response->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Requested-With, X-CSRF-TOKEN, X-Session-Id, X-Socket-Id, Cache-Control, Pragma');
             $response->header('Access-Control-Allow-Credentials', 'true');
             $response->header('Access-Control-Max-Age', '86400');
 
@@ -44,8 +44,8 @@ class CorsMiddleware
             $response->header('Access-Control-Allow-Origin', $origin);
         }
 
-        $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        $response->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With, X-CSRF-TOKEN');
+        $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        $response->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Requested-With, X-CSRF-TOKEN, X-Session-Id, X-Socket-Id, Cache-Control, Pragma');
         $response->header('Access-Control-Allow-Credentials', 'true');
 
         return $response;
