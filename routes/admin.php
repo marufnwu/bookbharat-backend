@@ -86,7 +86,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/{product}/analytics', [ProductController::class, 'analytics']);
         Route::post('/import', [ProductController::class, 'import']);
         Route::get('/export', [ProductController::class, 'export']);
-        
+
         // Bundle Variant Management
         Route::get('/{product}/bundle-variants', [ProductBundleVariantController::class, 'index']);
         Route::post('/{product}/bundle-variants', [ProductBundleVariantController::class, 'store']);
@@ -365,6 +365,19 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::put('/templates/{template}', [NotificationController::class, 'updateTemplate']);
         Route::delete('/templates/{template}', [NotificationController::class, 'deleteTemplate']);
         Route::get('/logs', [NotificationController::class, 'getLogs']);
+    });
+
+    // Notification Settings (SMS/WhatsApp/Email Configuration)
+    Route::prefix('notification-settings')->controller(\App\Http\Controllers\Admin\NotificationSettingsController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::put('/', 'update');
+        Route::get('/channels', 'getChannels');
+        Route::post('/test', 'sendTestNotification');
+        Route::post('/sms/test-connection', 'testSMS');
+        Route::post('/whatsapp/test-connection', 'testWhatsApp');
+        Route::post('/whatsapp/sync-templates', 'syncWhatsAppTemplates');
+        Route::get('/email/config', 'getEmailConfig');
+        Route::put('/email/config', 'updateEmailConfig');
     });
 
     // Settings

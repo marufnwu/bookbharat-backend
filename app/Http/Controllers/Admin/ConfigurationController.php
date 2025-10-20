@@ -115,9 +115,7 @@ class ConfigurationController extends Controller
         return response()->json([
             'success' => true,
             'data' => $config
-        ])->header('Access-Control-Allow-Origin', '*')
-          ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-          ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+        ]);
     }
 
     /**
@@ -250,9 +248,7 @@ class ConfigurationController extends Controller
         return response()->json([
             'success' => true,
             'data' => $config
-        ])->header('Access-Control-Allow-Origin', '*')
-          ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-          ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+        ]);
     }
 
     /**
@@ -379,9 +375,7 @@ class ConfigurationController extends Controller
         return response()->json([
             'success' => true,
             'data' => $navigation
-        ])->header('Access-Control-Allow-Origin', '*')
-          ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-          ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+        ]);
     }
 
     /**
@@ -427,9 +421,7 @@ class ConfigurationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Site configuration updated successfully'
-            ])->header('Access-Control-Allow-Origin', '*')
-              ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-              ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Request-With');
+            ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([

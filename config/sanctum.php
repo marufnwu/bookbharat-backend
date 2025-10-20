@@ -15,10 +15,25 @@ return [
     |
     */
 
-    'stateful' => array_filter(array_map('trim', explode(',', env('SANCTUM_STATEFUL_DOMAINS',
-        'localhost,localhost:3000,localhost:3001,localhost:3002,localhost:3003,localhost:3004,localhost:3005,' .
-        '127.0.0.1,127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002,127.0.0.1:3003,127.0.0.1:8000,::1'
-    )))),
+    'stateful' => array_filter(array_merge(
+        // Generate all ports in 3000 range
+        array_map(fn($port) => "localhost:$port", range(3000, 3099)),
+        array_map(fn($port) => "127.0.0.1:$port", range(3000, 3099)),
+        [
+            'localhost',
+            '127.0.0.1',
+            '::1',
+            'localhost:4000',
+            'localhost:5000',
+            'localhost:8000',
+            'localhost:8080',
+            '127.0.0.1:4000',
+            '127.0.0.1:5000',
+            '127.0.0.1:8000',
+            '127.0.0.1:8080',
+        ],
+        array_filter(explode(',', env('SANCTUM_STATEFUL_DOMAINS', '')))
+    )),
 
     /*
     |--------------------------------------------------------------------------

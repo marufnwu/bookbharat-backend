@@ -22,10 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
 
-        // Enable CORS for API routes
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
-        ]);
+        // Prepend CORS middleware with highest priority
+        $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
 
         // Exclude payment webhook routes from CSRF verification
         $middleware->validateCsrfTokens(except: [

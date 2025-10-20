@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\NotificationSetting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -12,12 +13,18 @@ class NotificationService
     protected $smsConfig;
     protected $pushConfig;
     protected $emailConfig;
+    protected $smsGatewayService;
+    protected $whatsappService;
 
-    public function __construct()
-    {
-        $this->smsConfig = config('services.sms');
-        $this->pushConfig = config('services.push');
+    public function __construct(
+        SMSGatewayService $smsGatewayService,
+        WhatsAppBusinessService $whatsappService
+    ) {
+        $this->smsConfig = config('notifications.sms', []);
+        $this->pushConfig = config('notifications.push', []);
         $this->emailConfig = config('mail');
+        $this->smsGatewayService = $smsGatewayService;
+        $this->whatsappService = $whatsappService;
     }
 
     /**
@@ -49,28 +56,9 @@ class NotificationService
      */
     public function sendSMS(string $to, string $message, array $options = [])
     {
-        // Remove country code if present
-        $to = preg_replace('/^\+91/', '', $to);
-        
         try {
-            // Example implementation for MSG91
-            if ($this->smsConfig['provider'] === 'msg91') {
-                return $this->sendViaMsg91($to, $message, $options);
-            }
-            
-            // Example implementation for Twilio
-            if ($this->smsConfig['provider'] === 'twilio') {
-                return $this->sendViaTwilio($to, $message, $options);
-            }
-            
-            // Example implementation for TextLocal
-            if ($this->smsConfig['provider'] === 'textlocal') {
-                return $this->sendViaTextLocal($to, $message, $options);
-            }
-            
-            Log::warning('No SMS provider configured');
-            return ['success' => false, 'error' => 'No SMS provider configured'];
-            
+            $eventType = $options['event_type'] ?? null;
+            return $this->smsGatewayService->send($to, $message, $eventType);
         } catch (\Exception $e) {
             Log::error('SMS sending failed', [
                 'to' => $to,
@@ -118,19 +106,16 @@ class NotificationService
     public function sendWhatsApp(string $to, string $message, array $options = [])
     {
         try {
-            // WhatsApp Business API implementation
-            if ($this->smsConfig['whatsapp_provider'] === 'twilio') {
-                return $this->sendWhatsAppViaTwilio($to, $message, $options);
+            $eventType = $options['event_type'] ?? null;
+            $templateName = $options['template_name'] ?? null;
+            $components = $options['components'] ?? [];
+
+            // Use template if provided, otherwise send as text
+            if ($templateName) {
+                return $this->whatsappService->send($to, $templateName, $components, $eventType);
+            } else {
+                return $this->whatsappService->sendText($to, $message, $eventType);
             }
-            
-            // Other WhatsApp providers
-            if ($this->smsConfig['whatsapp_provider'] === 'wati') {
-                return $this->sendWhatsAppViaWati($to, $message, $options);
-            }
-            
-            Log::warning('No WhatsApp provider configured');
-            return ['success' => false, 'error' => 'No WhatsApp provider configured'];
-            
         } catch (\Exception $e) {
             Log::error('WhatsApp sending failed', [
                 'to' => $to,
@@ -149,8 +134,12 @@ class NotificationService
     {
         $results = [];
         
+        // Get notification settings for this event type
+        $settings = NotificationSetting::getForEvent($type);
+        $enabledChannels = $settings->channels ?? ['email'];
+
         // Email notification
-        if ($user->email_notifications_enabled ?? true) {
+        if (in_array('email', $enabledChannels) && ($user->email_notifications_enabled ?? true)) {
             $results['email'] = $this->sendEmail(
                 $user->email,
                 $data['subject'] ?? 'Notification from BookBharat',
@@ -160,15 +149,33 @@ class NotificationService
         }
         
         // SMS notification
-        if (($user->sms_notifications_enabled ?? false) && $user->phone) {
+        if (in_array('sms', $enabledChannels) && ($user->sms_notifications_enabled ?? false) && $user->phone) {
+            $smsMessage = $this->buildSMSMessage($type, $data);
             $results['sms'] = $this->sendSMS(
                 $user->phone,
-                $data['sms_message'] ?? $data['message'] ?? ''
+                $smsMessage,
+                ['event_type' => $type]
+            );
+        }
+        
+        // WhatsApp notification
+        if (in_array('whatsapp', $enabledChannels) && ($user->whatsapp_notifications_enabled ?? false) && $user->phone) {
+            $whatsappTemplate = $this->getWhatsAppTemplate($type);
+            $whatsappComponents = $data['whatsapp_components'] ?? [];
+            
+            $results['whatsapp'] = $this->sendWhatsApp(
+                $user->phone,
+                $data['message'] ?? '',
+                [
+                    'event_type' => $type,
+                    'template_name' => $whatsappTemplate,
+                    'components' => $whatsappComponents
+                ]
             );
         }
         
         // Push notification
-        if ($user->push_token) {
+        if (in_array('push', $enabledChannels) && $user->push_token) {
             $results['push'] = $this->sendPush(
                 $user->push_token,
                 $data['push_title'] ?? $data['title'] ?? 'BookBharat',
@@ -181,6 +188,37 @@ class NotificationService
         $results['in_app'] = $this->createInAppNotification($user, $type, $data);
         
         return $results;
+    }
+
+    /**
+     * Build SMS message from template
+     */
+    protected function buildSMSMessage($eventType, $data)
+    {
+        $template = config("notifications.sms_templates.{$eventType}");
+        
+        if (!$template) {
+            return $data['sms_message'] ?? $data['message'] ?? 'Notification from BookBharat';
+        }
+
+        // Replace variables in template
+        $replacements = [
+            '{name}' => $data['user']->name ?? $data['name'] ?? 'Customer',
+            '{order_number}' => $data['order_number'] ?? '',
+            '{amount}' => $data['order_total'] ?? $data['amount'] ?? '',
+            '{tracking_number}' => $data['tracking_number'] ?? '',
+            '{url}' => $data['action_url'] ?? config('app.frontend_url'),
+        ];
+
+        return str_replace(array_keys($replacements), array_values($replacements), $template);
+    }
+
+    /**
+     * Get WhatsApp template name for event type
+     */
+    protected function getWhatsAppTemplate($eventType)
+    {
+        return config("notifications.whatsapp_template_mappings.{$eventType}");
     }
 
     /**
@@ -210,51 +248,7 @@ class NotificationService
         }
     }
 
-    // Provider-specific implementations
-
-    protected function sendViaMsg91($to, $message, $options)
-    {
-        $response = Http::post('https://api.msg91.com/api/v5/flow/', [
-            'authkey' => $this->smsConfig['msg91_auth_key'],
-            'mobiles' => '91' . $to,
-            'country' => '91',
-            'message' => $message,
-            'route' => $options['route'] ?? '4',
-            'sender' => $this->smsConfig['sender_id'] ?? 'BKBHRT',
-        ]);
-        
-        return ['success' => $response->successful(), 'response' => $response->json()];
-    }
-
-    protected function sendViaTwilio($to, $message, $options)
-    {
-        $client = new \Twilio\Rest\Client(
-            $this->smsConfig['twilio_sid'],
-            $this->smsConfig['twilio_token']
-        );
-        
-        $result = $client->messages->create(
-            '+91' . $to,
-            [
-                'from' => $this->smsConfig['twilio_from'],
-                'body' => $message
-            ]
-        );
-        
-        return ['success' => true, 'sid' => $result->sid];
-    }
-
-    protected function sendViaTextLocal($to, $message, $options)
-    {
-        $response = Http::post('https://api.textlocal.in/send/', [
-            'apikey' => $this->smsConfig['textlocal_api_key'],
-            'numbers' => $to,
-            'message' => $message,
-            'sender' => $this->smsConfig['sender_id'] ?? 'BKBHRT',
-        ]);
-        
-        return ['success' => $response->successful(), 'response' => $response->json()];
-    }
+    // Provider-specific implementations removed - now using direct API services
 
     protected function sendViaFCM($token, $title, $body, $data)
     {
@@ -291,36 +285,4 @@ class NotificationService
         return ['success' => $response->successful(), 'response' => $response->json()];
     }
 
-    protected function sendWhatsAppViaTwilio($to, $message, $options)
-    {
-        $client = new \Twilio\Rest\Client(
-            $this->smsConfig['twilio_sid'],
-            $this->smsConfig['twilio_token']
-        );
-        
-        $result = $client->messages->create(
-            'whatsapp:+91' . $to,
-            [
-                'from' => 'whatsapp:' . $this->smsConfig['twilio_whatsapp_from'],
-                'body' => $message
-            ]
-        );
-        
-        return ['success' => true, 'sid' => $result->sid];
-    }
-
-    protected function sendWhatsAppViaWati($to, $message, $options)
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->smsConfig['wati_api_key'],
-            'Content-Type' => 'application/json',
-        ])->post($this->smsConfig['wati_base_url'] . '/api/v1/sendTemplateMessage', [
-            'whatsappNumber' => '91' . $to,
-            'template_name' => $options['template'] ?? 'default',
-            'broadcast_name' => $options['broadcast'] ?? 'default',
-            'parameters' => $options['parameters'] ?? [$message],
-        ]);
-        
-        return ['success' => $response->successful(), 'response' => $response->json()];
-    }
 }

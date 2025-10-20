@@ -40,7 +40,15 @@ class ProductImage extends Model
             return $this->image_path;
         }
 
-        // Otherwise, assume it's a local storage path
-        return Storage::disk('public')->url($this->image_path);
+        // Get the storage URL
+        $url = Storage::disk('public')->url($this->image_path);
+
+        // If URL is relative, prepend the APP_URL
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            $appUrl = rtrim(config('app.url'), '/');
+            $url = $appUrl . $url;
+        }
+
+        return $url;
     }
 }

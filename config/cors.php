@@ -20,7 +20,7 @@ return [
      * You can enable CORS for 1 or multiple paths.
      * Example: ['api/*']
      */
-    'paths' => ['api/*'],
+    'paths' => [],  // Disable built-in CORS, using custom middleware instead
 
     /*
     * Matches the request method. `[*]` allows all methods.
@@ -29,8 +29,33 @@ return [
 
     /*
      * Matches the request origin. `[*]` allows all origins.
+     * Note: When using credentials, specify exact origins instead of '*'
      */
-    'allowed_origins' => ['*'],
+    'allowed_origins' => array_filter(array_merge(
+        // Generate all ports in 3000 range for localhost
+        array_map(fn($port) => "http://localhost:$port", range(3000, 3099)),
+        // Generate all ports in 3000 range for 127.0.0.1
+        array_map(fn($port) => "http://127.0.0.1:$port", range(3000, 3099)),
+        [
+            // Additional common development ports
+            'http://localhost:4000',
+            'http://localhost:5000',
+            'http://localhost:8080',
+            'http://localhost:8081',
+            'http://127.0.0.1:4000',
+            'http://127.0.0.1:5000',
+            'http://127.0.0.1:8080',
+            'http://127.0.0.1:8081',
+
+            // Production URLs
+            env('FRONTEND_URL'),      // Production frontend
+            env('ADMIN_URL'),         // Production admin panel
+            'http://v2a.bookbharat.com',
+            'https://v2a.bookbharat.com',
+            'http://v2.bookbharat.com',
+            'https://v2.bookbharat.com',
+        ]
+    )),
 
     /*
      * Matches the request origin with, similar to `Request::is()`
