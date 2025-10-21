@@ -42,6 +42,7 @@ class Product extends Model
         'isbn',
         'language',
         'pages',
+        'format',
         'publication_date',
         'status',
         'rating',
@@ -205,7 +206,7 @@ class Product extends Model
             return [
                 'id' => $image->id,
                 'image_path' => $image->image_path,
-                'image_url' => Storage::disk('public')->url($image->image_path),
+                'image_url' => $image->image_url, // Use the accessor from ProductImage model
                 'alt_text' => $image->alt_text,
             ];
         }
