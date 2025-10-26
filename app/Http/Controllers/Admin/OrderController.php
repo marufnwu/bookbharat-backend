@@ -228,7 +228,7 @@ class OrderController extends Controller
             }
 
             $oldStatus = $order->status;
-            
+
             // Update order status
             $order->update([
                 'status' => 'cancelled',
@@ -409,12 +409,12 @@ class OrderController extends Controller
                 'order' => $order,
                 'company' => [
                     'name' => config('app.name', 'BookBharat'),
-                    'address' => 'BookBharat HQ, 123 Knowledge Street',
-                    'city' => 'Mumbai, Maharashtra 400001',
-                    'country' => 'India',
-                    'email' => 'support@bookbharat.com',
-                    'phone' => '+91 9876543210',
-                    'gstin' => 'GSTIN123456789',
+                    'address' => \App\Models\AdminSetting::get('company_address_line1', 'BookBharat HQ'),
+                    'city' => \App\Models\AdminSetting::get('company_city', 'Mumbai') . ', ' . \App\Models\AdminSetting::get('company_state', 'Maharashtra') . ' ' . \App\Models\AdminSetting::get('company_pincode', '400001'),
+                    'country' => \App\Models\AdminSetting::get('company_country', 'India'),
+                    'email' => \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com'),
+                    'phone' => \App\Models\AdminSetting::get('contact_phone', '+91 9876543210'),
+                    'gstin' => \App\Models\AdminSetting::get('gst_number', 'GSTIN123456789'),
                 ],
                 'invoice_number' => 'INV-' . $order->order_number,
                 'invoice_date' => $order->created_at->format('d M Y'),

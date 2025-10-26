@@ -113,7 +113,7 @@
             <div>
                 <strong>Invoice Number:</strong> {{ $order->order_number }}<br>
                 <strong>Order Date:</strong> {{ $order->created_at->format('d M Y, H:i A') }}<br>
-                <strong>Payment Status:</strong> 
+                <strong>Payment Status:</strong>
                 <span style="color: {{ $order->payment_status === 'paid' ? '#28a745' : '#dc3545' }}">
                     {{ ucfirst($order->payment_status) }}
                 </span>
@@ -197,8 +197,8 @@
                     <strong>{{ $item->product_name }}</strong><br>
                     @if($item->product && $item->product->metadata)
                         @php
-                            $metadata = is_string($item->product->metadata) 
-                                ? json_decode($item->product->metadata, true) 
+                            $metadata = is_string($item->product->metadata)
+                                ? json_decode($item->product->metadata, true)
                                 : $item->product->metadata;
                         @endphp
                         @if(isset($metadata['author']))
@@ -223,14 +223,14 @@
             <span>Subtotal:</span>
             <span>₹{{ number_format($order->subtotal, 2) }}</span>
         </div>
-        
+
         @if($order->discount_amount > 0)
         <div class="total-row">
             <span>Discount:</span>
             <span style="color: #28a745;">-₹{{ number_format($order->discount_amount, 2) }}</span>
         </div>
         @endif
-        
+
         <div class="total-row">
             <span>Shipping:</span>
             <span>
@@ -241,12 +241,12 @@
                 @endif
             </span>
         </div>
-        
+
         <div class="total-row">
             <span>Tax (GST):</span>
             <span>₹{{ number_format($order->tax_amount, 2) }}</span>
         </div>
-        
+
         <div class="total-row final">
             <span>Total Amount:</span>
             <span>₹{{ number_format($order->total_amount, 2) }}</span>

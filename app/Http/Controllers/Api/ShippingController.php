@@ -34,7 +34,7 @@ class ShippingController extends Controller
         try {
             $userId = auth()->id();
             $sessionId = $request->header('X-Session-ID');
-            
+
             // Get cart items
             $cart = Cart::where(function($query) use ($userId, $sessionId) {
                 if ($userId) {
@@ -53,7 +53,7 @@ class ShippingController extends Controller
 
             $pickupPincode = $this->getDefaultPickupPincode();
             $deliveryPincode = $request->delivery_pincode;
-            
+
             $options = [
                 'include_insurance' => $request->boolean('include_insurance'),
                 'delivery_option_id' => $request->delivery_option_id,
@@ -114,7 +114,7 @@ class ShippingController extends Controller
             $pickupPincode = $this->getDefaultPickupPincode();
             $deliveryPincode = $request->delivery_pincode;
             $orderValue = $request->order_value ?? 0;
-            
+
             $options = [
                 'include_insurance' => $request->boolean('include_insurance'),
                 'delivery_option_id' => $request->delivery_option_id,
@@ -179,10 +179,10 @@ class ShippingController extends Controller
 
         try {
             $deliveryPincode = $request->pincode;
-            
+
             // First check if pincode exists in our database
             $pincodeDetails = \App\Models\Pincode::getPincodeDetails($deliveryPincode);
-            
+
             if (!$pincodeDetails) {
                 return response()->json([
                     'success' => false,
@@ -194,7 +194,7 @@ class ShippingController extends Controller
 
             // Check if delivery is available for this pincode
             $deliveryAvailable = \App\Models\Pincode::isDeliveryAvailable($deliveryPincode);
-            
+
             if (!$deliveryAvailable) {
                 return response()->json([
                     'success' => false,
@@ -217,7 +217,7 @@ class ShippingController extends Controller
                     'delivery_status' => $pincodeDetails['delivery_status'],
                 ],
                 'estimated_delivery' => '2-7 business days',
-                'free_shipping_threshold' => 999,
+                'free_shipping_threshold' => (int) \App\Models\AdminSetting::get('free_shipping_threshold', 500),
                 'cod_available' => true
             ]);
 
@@ -238,23 +238,23 @@ class ShippingController extends Controller
     {
         try {
             $zones = $this->shippingService->getShippingZones();
-            
+
             // Sample rates for different weight brackets
             $sampleRates = [];
             $weights = [0.5, 1.0, 2.0, 5.0, 10.0];
-            
+
             foreach ($zones as $zoneCode => $zoneInfo) {
                 $zoneRates = [];
                 foreach ($weights as $weight) {
                     // Calculate rate for this weight
                     $dummyItems = [['product_id' => 1, 'quantity' => 1]];
                     $shippingData = $this->shippingService->calculateShippingCharges(
-                        '110001', 
+                        '110001',
                         $zoneCode === 'A' ? '110001' : '400001', // Different zones
                         $dummyItems,
                         0
                     );
-                    
+
                     $zoneRates[$weight . 'kg'] = '₹' . $shippingData['base_cost'];
                 }
                 $sampleRates[$zoneCode] = [

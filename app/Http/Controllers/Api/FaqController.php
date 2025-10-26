@@ -17,25 +17,25 @@ class FaqController extends Controller
         try {
             $category = $request->get('category');
             $search = $request->get('search');
-            
+
             // Get FAQs from cache (in production, this would be from database)
             $faqs = Cache::get('faqs', $this->getDefaultFaqs());
-            
+
             // Filter by category if provided
             if ($category) {
                 $faqs = array_filter($faqs, function($faq) use ($category) {
                     return $faq['category'] === $category;
                 });
             }
-            
+
             // Filter by search term if provided
             if ($search) {
                 $faqs = array_filter($faqs, function($faq) use ($search) {
-                    return stripos($faq['question'], $search) !== false || 
+                    return stripos($faq['question'], $search) !== false ||
                            stripos($faq['answer'], $search) !== false;
                 });
             }
-            
+
             // Sort by order, then by question
             usort($faqs, function($a, $b) {
                 if ($a['order'] === $b['order']) {
@@ -157,7 +157,7 @@ class FaqController extends Controller
     {
         try {
             $query = $request->get('q', '');
-            
+
             if (strlen($query) < 2) {
                 return response()->json([
                     'success' => false,
@@ -166,22 +166,22 @@ class FaqController extends Controller
             }
 
             $faqs = Cache::get('faqs', $this->getDefaultFaqs());
-            
+
             // Search in questions and answers
             $results = array_filter($faqs, function($faq) use ($query) {
-                return stripos($faq['question'], $query) !== false || 
+                return stripos($faq['question'], $query) !== false ||
                        stripos($faq['answer'], $query) !== false ||
                        stripos($faq['category'], $query) !== false;
             });
-            
+
             // Sort by relevance (question matches first, then answer matches)
             usort($results, function($a, $b) use ($query) {
                 $aQuestionMatch = stripos($a['question'], $query) !== false;
                 $bQuestionMatch = stripos($b['question'], $query) !== false;
-                
+
                 if ($aQuestionMatch && !$bQuestionMatch) return -1;
                 if (!$aQuestionMatch && $bQuestionMatch) return 1;
-                
+
                 return strcmp($a['question'], $b['question']);
             });
 
@@ -384,7 +384,7 @@ class FaqController extends Controller
             [
                 'id' => 19,
                 'question' => 'How do I contact customer support?',
-                'answer' => 'You can reach our customer support team:\n• Email: support@bookbharat.com\n• Phone: +91 12345 67890 (Mon-Fri, 9 AM - 6 PM)\n• Contact form on our website\n• Live chat (when available)\n\nWe respond to all queries within 24 hours.',
+                'answer' => 'You can reach our customer support team:\n• Email: ' . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . '\n• Phone: ' . \App\Models\AdminSetting::get('contact_phone', '+91 12345 67890') . ' (Mon-Fri, 9 AM - 6 PM)\n• Contact form on our website\n• Live chat (when available)\n\nWe respond to all queries within 24 hours.',
                 'category' => 'technical',
                 'order' => 3,
                 'helpful_count' => 61,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContentPage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -15,19 +16,38 @@ class StaticPageController extends Controller
     public function getPage($slug)
     {
         try {
-            // Get page data from cache (in production, this would be from database)
-            $pageData = Cache::get("content_page_{$slug}");
-            
+            // First try to get from database
+            $page = ContentPage::where('slug', $slug)
+                ->where('is_active', true)
+                ->first();
+
+            if ($page) {
+                // Use content with dynamic placeholders replaced
+                $content = $page->getContentWithDynamicInfo();
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'slug' => $page->slug,
+                        'title' => $page->title,
+                        'content' => $content,
+                        'excerpt' => $page->excerpt,
+                        'meta_title' => $page->meta_title,
+                        'meta_description' => $page->meta_description,
+                        'meta_keywords' => $page->meta_keywords,
+                        'og_image' => $page->og_image,
+                    ]
+                ], 200);
+            }
+
+            // Fallback to default content if not found in database
+            $pageData = $this->getDefaultContent($slug);
+
             if (!$pageData) {
-                // Return default content if no custom content is set
-                $pageData = $this->getDefaultContent($slug);
-                
-                if (!$pageData) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Page not found.',
-                    ], 404);
-                }
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Page not found.',
+                ], 404);
             }
 
             return response()->json([
@@ -54,42 +74,35 @@ class StaticPageController extends Controller
     public function getPages()
     {
         try {
-            $pages = [
-                'privacy' => [
-                    'slug' => 'privacy',
-                    'title' => 'Privacy Policy',
-                    'description' => 'Learn about our privacy policy and data protection practices.'
-                ],
-                'terms' => [
-                    'slug' => 'terms',
-                    'title' => 'Terms of Service',
-                    'description' => 'Terms and conditions for using BookBharat services.'
-                ],
-                'cookies' => [
-                    'slug' => 'cookies',
-                    'title' => 'Cookie Policy',
-                    'description' => 'Information about cookies and how we use them.'
-                ],
-                'refund' => [
-                    'slug' => 'refund',
-                    'title' => 'Refund Policy',
-                    'description' => 'Our refund and return policy details.'
-                ],
-                'shipping' => [
-                    'slug' => 'shipping',
-                    'title' => 'Shipping Policy',
-                    'description' => 'Information about shipping and delivery.'
-                ],
-                'about' => [
-                    'slug' => 'about',
-                    'title' => 'About Us',
-                    'description' => 'Learn more about BookBharat and our mission.'
-                ]
-            ];
+            // Get pages from database
+            $pages = ContentPage::where('is_active', true)
+                ->orderBy('order')
+                ->orderBy('title')
+                ->get(['slug', 'title', 'excerpt'])
+                ->map(function ($page) {
+                    return [
+                        'slug' => $page->slug,
+                        'title' => $page->title,
+                        'description' => $page->excerpt
+                    ];
+                })
+                ->toArray();
+
+            // If no pages in database, return default list
+            if (empty($pages)) {
+                $pages = [
+                    ['slug' => 'privacy', 'title' => 'Privacy Policy', 'description' => 'Learn about our privacy policy and data protection practices.'],
+                    ['slug' => 'terms', 'title' => 'Terms of Service', 'description' => 'Terms and conditions for using BookBharat services.'],
+                    ['slug' => 'cookies', 'title' => 'Cookie Policy', 'description' => 'Information about cookies and how we use them.'],
+                    ['slug' => 'refund', 'title' => 'Refund Policy', 'description' => 'Our refund and return policy details.'],
+                    ['slug' => 'shipping', 'title' => 'Shipping Policy', 'description' => 'Information about shipping and delivery.'],
+                    ['slug' => 'about', 'title' => 'About Us', 'description' => 'Learn more about BookBharat and our mission.'],
+                ];
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => array_values($pages)
+                'data' => $pages
             ], 200);
 
         } catch (\Exception $e) {
@@ -177,7 +190,7 @@ class StaticPageController extends Controller
 <p>You have the right to access, update, or delete your personal information. You can also opt out of certain communications from us.</p>
 
 <h2>6. Contact Us</h2>
-<p>If you have any questions about this privacy policy, please contact us at support@bookbharat.com.</p>
+<p>If you have any questions about this privacy policy, please contact us at " . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . ".</p>
         ";
     }
 
@@ -206,7 +219,7 @@ class StaticPageController extends Controller
 <p>BookBharat shall not be liable for any indirect, incidental, or consequential damages.</p>
 
 <h2>7. Contact Information</h2>
-<p>For questions about these terms, contact us at support@bookbharat.com.</p>
+<p>For questions about these terms, contact us at " . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . ".</p>
         ";
     }
 
@@ -233,7 +246,7 @@ class StaticPageController extends Controller
 <p>You can control and delete cookies through your browser settings. However, this may affect the functionality of our website.</p>
 
 <h2>5. Contact Us</h2>
-<p>If you have questions about our cookie policy, contact us at support@bookbharat.com.</p>
+<p>If you have questions about our cookie policy, contact us at " . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . ".</p>
         ";
     }
 
@@ -259,7 +272,7 @@ class StaticPageController extends Controller
 <p>We provide free return shipping for defective items. For other returns, shipping costs are the customer's responsibility.</p>
 
 <h2>6. Contact Us</h2>
-<p>For return requests or questions, contact our customer service at support@bookbharat.com.</p>
+<p>For return requests or questions, contact our customer service at " . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . ".</p>
         ";
     }
 
@@ -273,7 +286,7 @@ class StaticPageController extends Controller
 <p>We currently ship within India to most locations. Some remote areas may have limited shipping options.</p>
 
 <h2>2. Shipping Costs</h2>
-<p>Free shipping is available on orders above ₹499. For smaller orders, shipping charges apply based on location.</p>
+<p>Free shipping is available on orders above ₹" . \App\Models\AdminSetting::get('free_shipping_threshold', 500) . ". For smaller orders, shipping charges apply based on location.</p>
 
 <h2>3. Delivery Times</h2>
 <ul>
@@ -286,7 +299,7 @@ class StaticPageController extends Controller
 <p>Orders are processed within 24 hours of placement. You'll receive tracking information once your order ships.</p>
 
 <h2>5. Contact Us</h2>
-<p>For shipping inquiries, contact us at support@bookbharat.com.</p>
+<p>For shipping inquiries, contact us at " . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . ".</p>
         ";
     }
 
@@ -321,9 +334,9 @@ class StaticPageController extends Controller
 <h2>Contact Us</h2>
 <p>Have questions or feedback? We'd love to hear from you!</p>
 <ul>
-<li><strong>Email:</strong> support@bookbharat.com</li>
-<li><strong>Phone:</strong> +91 12345 67890</li>
-<li><strong>Address:</strong> Mumbai, Maharashtra, India</li>
+<li><strong>Email:</strong> " . \App\Models\AdminSetting::get('support_email', 'support@bookbharat.com') . "</li>
+<li><strong>Phone:</strong> " . \App\Models\AdminSetting::get('contact_phone', '+91 12345 67890') . "</li>
+<li><strong>Address:</strong> " . \App\Models\AdminSetting::get('company_city', 'Mumbai') . ", " . \App\Models\AdminSetting::get('company_state', 'Maharashtra') . ", " . \App\Models\AdminSetting::get('company_country', 'India') . "</li>
 </ul>
         ";
     }

@@ -6,9 +6,9 @@
 
 @section('content')
     <h2>Hi {{ $user->name }},</h2>
-    
+
     <p>We received a request to reset your password for your {{ config('app.name') }} account.</p>
-    
+
     <div class="highlight">
         <h3>🔐 Reset Your Password</h3>
         <p>Click the button below to reset your password. This link will expire in 60 minutes for security reasons.</p>
@@ -37,7 +37,7 @@
 
     <h3>Didn't request this reset?</h3>
     <p>If you didn't request a password reset, your account is still secure. You can safely ignore this email, and your password won't be changed.</p>
-    
+
     <p>However, if you're concerned about your account security, please:</p>
     <ul>
         <li>Contact our support team immediately</li>

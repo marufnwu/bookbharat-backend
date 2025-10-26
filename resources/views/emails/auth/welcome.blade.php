@@ -6,9 +6,9 @@
 
 @section('content')
     <h2>Hi {{ $user->name }},</h2>
-    
+
     <p>Welcome to {{ config('app.name') }}! We're excited to have you join our community of book lovers.</p>
-    
+
     <div class="highlight">
         <h3>🎉 Your account is ready!</h3>
         <p><strong>Email:</strong> {{ $user->email }}</p>

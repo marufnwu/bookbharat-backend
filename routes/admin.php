@@ -407,6 +407,33 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/roles', [SettingsController::class, 'createRole']);
         Route::put('/roles/{role}', [SettingsController::class, 'updateRole']);
         Route::get('/activity-logs', [SettingsController::class, 'getActivityLogs']);
+
+        // Email Template Routes
+        Route::prefix('email-templates')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'index']);
+            Route::get('/{id}', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'show']);
+            Route::put('/{id}', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'update']);
+            Route::post('/{id}/preview', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'preview']);
+            Route::post('/{id}/test', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'sendTest']);
+        });
+    });
+
+    // Content Blocks Management
+    Route::prefix('content-blocks')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ContentBlockController::class, 'index']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\ContentBlockController::class, 'show']);
+        Route::post('/', [\App\Http\Controllers\Api\ContentBlockController::class, 'store']);
+        Route::put('/{id}', [\App\Http\Controllers\Api\ContentBlockController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Api\ContentBlockController::class, 'destroy']);
+    });
+
+    // Invoice Template Management
+    Route::prefix('invoice-templates')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\InvoiceTemplateController::class, 'index']);
+        Route::get('/{id}', [\App\Http\Controllers\Admin\InvoiceTemplateController::class, 'show']);
+        Route::post('/', [\App\Http\Controllers\Admin\InvoiceTemplateController::class, 'store']);
+        Route::put('/{id}', [\App\Http\Controllers\Admin\InvoiceTemplateController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\Admin\InvoiceTemplateController::class, 'destroy']);
     });
 
     // Payment Methods Management (New Clean Single Table System)
@@ -634,6 +661,22 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/events', [AuditLogController::class, 'events']);
         Route::get('/{id}', [AuditLogController::class, 'show']);
         Route::post('/purge', [AuditLogController::class, 'purge']);
+    });
+
+    // Abandoned Carts Management
+    Route::prefix('abandoned-carts')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'index']);
+        Route::get('/statistics', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'statistics']);
+        Route::get('/{id}', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'show']);
+        Route::post('/{id}/send-recovery-email', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'sendRecoveryEmail']);
+        Route::delete('/{id}', [\App\Http\Controllers\Admin\AbandonedCartController::class, 'destroy']);
+
+        // Analytics Routes
+        Route::prefix('analytics')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\AbandonedCartAnalyticsController::class, 'index']);
+            Route::get('/segment-comparison', [\App\Http\Controllers\Admin\AbandonedCartAnalyticsController::class, 'segmentComparison']);
+            Route::get('/discount-effectiveness', [\App\Http\Controllers\Admin\AbandonedCartAnalyticsController::class, 'discountEffectiveness']);
+        });
     });
 
 });

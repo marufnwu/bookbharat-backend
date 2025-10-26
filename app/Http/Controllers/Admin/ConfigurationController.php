@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogService;
+use App\Models\AdminSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -84,7 +85,7 @@ class ConfigurationController extends Controller
                     'currency' => 'INR',
                     'currency_symbol' => '₹',
                     'min_order_amount' => 99,
-                    'free_shipping_threshold' => 499
+                    'free_shipping_threshold' => (int) AdminSetting::get('free_shipping_threshold', 500)
                 ],
                 'shipping' => [
                     'zones_enabled' => true,

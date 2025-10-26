@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use App\Models\SiteConfiguration;
+use App\Models\ContentPage;
 
 class ContentController extends Controller
 {
@@ -76,7 +77,7 @@ class ContentController extends Controller
                     'currency' => 'INR',
                     'currency_symbol' => '₹',
                     'min_order_amount' => 99,
-                    'free_shipping_threshold' => 499
+                    'free_shipping_threshold' => (int) \App\Models\AdminSetting::get('free_shipping_threshold', 500)
                 ],
                 'shipping' => [
                     'zones_enabled' => true,
@@ -252,28 +253,19 @@ class ContentController extends Controller
      */
     public function getPages()
     {
-        $pages = [
-            [
-                'slug' => 'about',
-                'title' => 'About BookBharat',
-                'meta_title' => 'About Us - BookBharat',
-            ],
-            [
-                'slug' => 'contact',
-                'title' => 'Contact Us',
-                'meta_title' => 'Contact Us - BookBharat',
-            ],
-            [
-                'slug' => 'privacy',
-                'title' => 'Privacy Policy',
-                'meta_title' => 'Privacy Policy - BookBharat',
-            ],
-            [
-                'slug' => 'terms',
-                'title' => 'Terms of Service',
-                'meta_title' => 'Terms of Service - BookBharat',
-            ]
-        ];
+        $pages = ContentPage::orderBy('order')
+            ->orderBy('title')
+            ->get()
+            ->map(function ($page) {
+                return [
+                    'slug' => $page->slug,
+                    'title' => $page->title,
+                    'excerpt' => $page->excerpt,
+                    'content' => $page->content,
+                    'meta_title' => $page->meta_title,
+                    'meta_description' => $page->meta_description,
+                ];
+            });
 
         return response()->json([
             'success' => true,
@@ -286,34 +278,9 @@ class ContentController extends Controller
      */
     public function getPage($slug)
     {
-        $pages = [
-            'about' => [
-                'title' => 'About BookBharat',
-                'content' => 'We are India\'s premier online bookstore, dedicated to making knowledge accessible to everyone...',
-                'meta_title' => 'About Us - BookBharat',
-                'meta_description' => 'Learn about BookBharat, India\'s premier online bookstore.'
-            ],
-            'contact' => [
-                'title' => 'Contact Us',
-                'content' => 'Get in touch with us for any queries or support...',
-                'meta_title' => 'Contact Us - BookBharat',
-                'meta_description' => 'Contact BookBharat for customer support and inquiries.'
-            ],
-            'privacy' => [
-                'title' => 'Privacy Policy',
-                'content' => 'Your privacy is important to us. This policy explains how we collect and use your data...',
-                'meta_title' => 'Privacy Policy - BookBharat',
-                'meta_description' => 'Read our privacy policy to understand how we handle your data.'
-            ],
-            'terms' => [
-                'title' => 'Terms of Service',
-                'content' => 'By using our service, you agree to these terms and conditions...',
-                'meta_title' => 'Terms of Service - BookBharat',
-                'meta_description' => 'Read our terms of service and conditions of use.'
-            ]
-        ];
+        $page = ContentPage::where('slug', $slug)->first();
 
-        if (!isset($pages[$slug])) {
+        if (!$page) {
             return response()->json([
                 'success' => false,
                 'message' => 'Page not found'
@@ -322,7 +289,16 @@ class ContentController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $pages[$slug]
+            'data' => [
+                'slug' => $page->slug,
+                'title' => $page->title,
+                'content' => $page->content,
+                'excerpt' => $page->excerpt,
+                'meta_title' => $page->meta_title,
+                'meta_description' => $page->meta_description,
+                'meta_keywords' => $page->meta_keywords,
+                'og_image' => $page->og_image,
+            ]
         ]);
     }
 
@@ -441,8 +417,9 @@ class ContentController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'content' => 'required|string',
-            'meta_title' => 'required|string|max:255',
-            'meta_description' => 'required|string|max:160'
+            'meta_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string|max:160',
+            'excerpt' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -453,16 +430,25 @@ class ContentController extends Controller
             ], 422);
         }
 
-        $pageData = $request->all();
+        // Update in database
+        $page = \App\Models\ContentPage::where('slug', $slug)->first();
 
-        // In a real implementation, this would be stored in database
+        if (!$page) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Page not found'
+            ], 404);
+        }
+
+        $page->update($validator->validated());
+
+        // Clear cache
         Cache::forget("content_page_{$slug}");
-        Cache::put("content_page_{$slug}", $pageData, 3600);
 
         return response()->json([
             'success' => true,
             'message' => 'Content page updated successfully',
-            'data' => $pageData
+            'data' => $page
         ]);
     }
 

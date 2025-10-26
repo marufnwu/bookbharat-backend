@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\StaticPageController;
 use App\Http\Controllers\Api\FaqController;
+use App\Http\Controllers\Api\ContentBlockController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -127,6 +128,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/categories', [FaqController::class, 'getCategories']);
         Route::get('/search', [FaqController::class, 'search']);
         Route::get('/{id}', [FaqController::class, 'show']);
+    });
+
+    // Content Block Routes (Public)
+    Route::prefix('content-blocks')->group(function () {
+        Route::get('/key/{key}', [ContentBlockController::class, 'getByKey']);
+        Route::get('/category/{category}', [ContentBlockController::class, 'getByCategory']);
     });
 
     // Hero Configuration Routes (Read-only for public)

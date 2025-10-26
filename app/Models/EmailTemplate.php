@@ -11,27 +11,27 @@ class EmailTemplate extends Model
 
     protected $fillable = [
         'name',
+        'type',
+        'language',
         'subject',
-        'content',
+        'html_content',
+        'text_content',
         'variables',
-        'styles',
-        'category',
+        'design_settings',
         'is_active',
-        'description',
         'from_name',
         'from_email',
         'reply_to',
-        'cc',
-        'bcc',
-        'version',
+        'usage_count',
+        'created_by',
     ];
 
     protected $casts = [
         'variables' => 'array',
-        'styles' => 'array',
-        'cc' => 'array',
-        'bcc' => 'array',
+        'design_settings' => 'array',
         'is_active' => 'boolean',
+        'usage_count' => 'integer',
+        'created_by' => 'integer',
     ];
 
     /**
@@ -98,7 +98,8 @@ class EmailTemplate extends Model
     public function render(array $data = []): array
     {
         $subject = $this->subject;
-        $content = $this->content;
+        // Use html_content from database (which is the actual column name)
+        $content = $this->html_content ?? '';
 
         // Replace variables in subject and content
         foreach ($data as $key => $value) {
@@ -112,19 +113,13 @@ class EmailTemplate extends Model
             $content = str_replace($placeholder, $value, $content);
         }
 
-        // Apply styles if available
-        if ($this->styles) {
-            $content = $this->applyStyles($content);
-        }
-
         return [
             'subject' => $subject,
             'content' => $content,
+            'text_content' => $this->text_content,
             'from_name' => $this->from_name,
             'from_email' => $this->from_email,
             'reply_to' => $this->reply_to,
-            'cc' => $this->cc,
-            'bcc' => $this->bcc,
         ];
     }
 
@@ -177,33 +172,6 @@ class EmailTemplate extends Model
     private function renderCartItems($items): string
     {
         return $this->renderOrderItems($items);
-    }
-
-    /**
-     * Apply custom styles to the content
-     */
-    private function applyStyles($content): string
-    {
-        if (!$this->styles || !is_array($this->styles)) {
-            return $content;
-        }
-
-        $styleTag = '<style>';
-        foreach ($this->styles as $selector => $rules) {
-            $styleTag .= $selector . '{';
-            if (is_array($rules)) {
-                foreach ($rules as $property => $value) {
-                    $styleTag .= $property . ':' . $value . ';';
-                }
-            } else {
-                $styleTag .= $rules;
-            }
-            $styleTag .= '}';
-        }
-        $styleTag .= '</style>';
-
-        // Add styles to the beginning of content
-        return $styleTag . $content;
     }
 
     /**

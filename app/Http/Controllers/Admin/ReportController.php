@@ -482,7 +482,7 @@ class ReportController extends Controller
                 'name' => 'Monthly Sales Report',
                 'type' => 'sales',
                 'frequency' => 'monthly',
-                'recipients' => ['admin@bookbharat.com'],
+                'recipients' => [\App\Models\AdminSetting::get('support_email', 'admin@bookbharat.com')],
                 'last_run' => now()->subMonth()->toDateTimeString(),
                 'next_run' => now()->startOfMonth()->toDateTimeString(),
                 'is_active' => true,

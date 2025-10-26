@@ -39,7 +39,7 @@ class NotificationController extends Controller
                 [
                     'id' => 3,
                     'type' => 'sms',
-                    'recipient' => '+91-9876543210',
+                    'recipient' => \App\Models\AdminSetting::get('contact_phone', '+91-9876543210'),
                     'message' => 'Your order has been shipped',
                     'status' => 'failed',
                     'sent_at' => now()->subHours(1)->toDateTimeString(),
@@ -402,7 +402,7 @@ class NotificationController extends Controller
                     'id' => 3,
                     'type' => 'sms',
                     'template_name' => 'order_update',
-                    'recipient' => '+91-9876543210',
+                    'recipient' => \App\Models\AdminSetting::get('contact_phone', '+91-9876543210'),
                     'message' => 'Your order has been shipped',
                     'status' => 'failed',
                     'sent_at' => now()->subHours(1)->toDateTimeString(),

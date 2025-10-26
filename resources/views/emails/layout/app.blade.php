@@ -116,11 +116,11 @@
         <div class="footer">
             <p class="mb-0">Thank you for choosing {{ config('app.name') }}!</p>
             <p class="mb-0">
-                If you have any questions, contact us at 
+                If you have any questions, contact us at
                 <a href="mailto:support@bookbharat.com">support@bookbharat.com</a>
             </p>
             <p class="mb-0" style="margin-top: 15px;">
-                <a href="{{ config('app.url') }}">Visit our website</a> | 
+                <a href="{{ config('app.url') }}">Visit our website</a> |
                 <a href="{{ config('app.url') }}/contact">Contact Support</a>
             </p>
         </div>

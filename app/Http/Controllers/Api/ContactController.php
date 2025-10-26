@@ -33,12 +33,12 @@ class ContactController extends Controller
             }
 
             $contactData = $validator->validated();
-            
+
             // Add timestamp and IP for tracking
             $contactData['submitted_at'] = now();
             $contactData['ip_address'] = $request->ip();
             $contactData['user_agent'] = $request->userAgent();
-            
+
             // If user is authenticated, add user ID
             if (auth()->check()) {
                 $contactData['user_id'] = auth()->id();
@@ -49,7 +49,7 @@ class ContactController extends Controller
 
             // Send email notification to admin
             $this->sendAdminNotification($contactData);
-            
+
             // Send confirmation email to user
             $this->sendUserConfirmation($contactData);
 
@@ -77,8 +77,8 @@ class ContactController extends Controller
     private function sendAdminNotification($data)
     {
         try {
-            $adminEmail = config('mail.admin_email', 'admin@bookbharat.com');
-            
+            $adminEmail = \App\Models\AdminSetting::get('support_email', 'admin@bookbharat.com');
+
             $emailData = [
                 'subject' => 'New Contact Form Submission - ' . $data['category'],
                 'name' => $data['name'],
@@ -110,7 +110,7 @@ class ContactController extends Controller
     {
         try {
             $emailContent = $this->formatUserConfirmationEmail($data);
-            
+
             Mail::raw($emailContent, function ($message) use ($data) {
                 $message->to($data['email'], $data['name'])
                        ->subject('Thank you for contacting BookBharat - We have received your message')
@@ -178,7 +178,7 @@ Submitted on: {$data['submitted_at']->format('F j, Y \a\t g:i A')}
 What happens next?
 - Our support team will review your message within 24 hours
 - You will receive a detailed response via email
-- For urgent matters, you can also call us at +91 12345 67890
+- For urgent matters, you can also call us at " . \App\Models\AdminSetting::get('contact_phone', '+91 12345 67890') . "
 
 If you have any additional questions or concerns, please don't hesitate to reach out.
 

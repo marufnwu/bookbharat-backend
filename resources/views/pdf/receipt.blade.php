@@ -250,11 +250,11 @@
                 <div class="item-title">{{ $item->product_name }}</div>
                 <div class="item-price">₹{{ number_format($item->total_price, 2) }}</div>
             </div>
-            
+
             @if($item->product && $item->product->metadata)
                 @php
-                    $metadata = is_string($item->product->metadata) 
-                        ? json_decode($item->product->metadata, true) 
+                    $metadata = is_string($item->product->metadata)
+                        ? json_decode($item->product->metadata, true)
                         : $item->product->metadata;
                 @endphp
                 <div class="item-details">
@@ -269,7 +269,7 @@
                     @endif
                 </div>
             @endif
-            
+
             <div class="item-meta">
                 <span><strong>SKU:</strong> {{ $item->product_sku }}</span>
                 <span><strong>Qty:</strong> {{ $item->quantity }} × ₹{{ number_format($item->unit_price, 2) }}</span>
@@ -336,14 +336,14 @@
             <span>Subtotal:</span>
             <span>₹{{ number_format($order->subtotal, 2) }}</span>
         </div>
-        
+
         @if($order->discount_amount > 0)
         <div class="summary-row">
             <span>Discount Applied:</span>
             <span style="color: #28a745;">-₹{{ number_format($order->discount_amount, 2) }}</span>
         </div>
         @endif
-        
+
         <div class="summary-row">
             <span>Shipping Charges:</span>
             <span>
@@ -354,12 +354,12 @@
                 @endif
             </span>
         </div>
-        
+
         <div class="summary-row">
             <span>Tax (GST):</span>
             <span>₹{{ number_format($order->tax_amount, 2) }}</span>
         </div>
-        
+
         <div class="summary-row total">
             <span>Total Amount Paid:</span>
             <span>₹{{ number_format($order->total_amount, 2) }}</span>

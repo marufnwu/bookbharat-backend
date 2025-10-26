@@ -28,7 +28,7 @@ class DashboardController extends Controller
     public function overview()
     {
         $cacheKey = 'admin_dashboard_overview_' . now()->format('Y-m-d-H');
-        
+
         $data = Cache::remember($cacheKey, 3600, function () {
             return [
                 'stats' => $this->getOverviewStats(),
@@ -380,7 +380,7 @@ class DashboardController extends Controller
     protected function getSalesPeriodData(string $period, bool $isPrevious = false): array
     {
         $days = (int) filter_var($period, FILTER_SANITIZE_NUMBER_INT);
-        
+
         if ($isPrevious) {
             $endDate = now()->subDays($days);
             $startDate = $endDate->copy()->subDays($days);
@@ -403,7 +403,7 @@ class DashboardController extends Controller
     protected function getProductPerformance(string $period): array
     {
         $days = (int) filter_var($period, FILTER_SANITIZE_NUMBER_INT);
-        
+
         return Product::withCount(['orderItems as sales_count' => function ($query) use ($days) {
             $query->whereHas('order', function ($q) use ($days) {
                 $q->where('status', 'delivered')
@@ -452,7 +452,7 @@ class DashboardController extends Controller
     protected function getGeographicSales(string $period): array
     {
         $days = (int) filter_var($period, FILTER_SANITIZE_NUMBER_INT);
-        
+
         return Order::where('status', 'delivered')
             ->where('created_at', '>=', now()->subDays($days))
             ->selectRaw('JSON_EXTRACT(shipping_address, "$.city") as city, COUNT(*) as orders, SUM(total_amount) as revenue')
